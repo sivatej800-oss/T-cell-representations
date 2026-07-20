@@ -6,3 +6,11 @@ data/ad_datasets/*
 !data/ad_datasets/.gitkeep
 data/download_family/*
 !data/download_family/.gitkeep
+
+# Generated R environments and package caches
+code/csf_aging/renv/library/
+code/csf_aging/renv/staging/
+code/csf_aging/renv/cache/
+
+# Large generated sparse-matrix cache
+results/figure1d/sparse_cache/
