@@ -2,5 +2,7 @@
 .venv-ad-analysis-py313/
 __pycache__/
 *.py[cod]
-data/ad_datasets/
-data/download_family/
+data/ad_datasets/*
+!data/ad_datasets/.gitkeep
+data/download_family/*
+!data/download_family/.gitkeep
