@@ -1,25 +1,27 @@
 # Summer Project 2026
 
-This repo is connected to a Google Drive data folder through a local manifest:
+This repo expects large research data files to be uploaded directly into local ignored folders:
 
-- Drive folder: `Summer 2026_ AD_Research`
-- Local dataset path expected by code: `AD analysis/AD datasets/`
-- Optional override: set `AD_DATA_DIR` to a synced `AD datasets` folder.
+- `data/ad_datasets/`
+- `data/download_family/`
 
-The large data folders are intentionally ignored by git. To check whether the Drive data is available locally, run:
+The large data folders are intentionally ignored by git.
 
-```bash
-python "AD analysis/drive_connection/check_data_connection.py"
-```
+## Folder layout
 
-If Google Drive for desktop is installed, make the Drive folder available locally, then either keep/sync it at `AD analysis/AD datasets/` or point the project at the synced folder:
+- `code/` contains source code, scripts, notebooks, tests, and the vendored `scGPT-main` project.
+- `data/` contains local research datasets and downloaded source files.
 
-```bash
-export AD_DATA_DIR="/path/to/Summer 2026_ AD_Research/AD datasets"
-```
+## Expected files
 
-You can also create the ignored local links automatically after Drive for desktop exposes the folder:
+Put these files in `data/ad_datasets/`:
 
-```bash
-python "AD analysis/drive_connection/connect_drive_data.py"
-```
+- `GSE200164_metadata.csv`
+- `GSE200164_counts.csv`
+
+Put these files in `data/download_family/`:
+
+- `GSE200164_series_matrix.txt`
+- `GSE200164_family.soft`
+
+`GSE200164_lognorm_expression.csv` is intentionally excluded from the local dataset upload.

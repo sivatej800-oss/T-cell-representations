@@ -1,5 +1,6 @@
 .DS_Store
 .venv-ad-analysis-py313/
-AD analysis/AD datasets/
-AD analysis/download family/
-AD analysis/drive_connection/drive_data_manifest.local.json
+__pycache__/
+*.py[cod]
+data/ad_datasets/
+data/download_family/
