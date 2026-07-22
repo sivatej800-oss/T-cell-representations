@@ -7,6 +7,10 @@ data/ad_datasets/*
 data/download_family/*
 !data/download_family/.gitkeep
 
+# Alternate folder names used by the locally uploaded GEO files.
+data/AD datasets/*
+data/download family/*
+
 # Generated R environments and package caches
 code/csf_aging/renv/library/
 code/csf_aging/renv/staging/
@@ -14,3 +18,7 @@ code/csf_aging/renv/cache/
 
 # Large generated sparse-matrix cache
 results/figure1d/sparse_cache/
+
+# Figure recreation artifacts and smoke-test checkpoints are reproducible outputs.
+results/figure1d/*
+results/figure1d_smoke/*
