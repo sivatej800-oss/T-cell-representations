@@ -144,6 +144,9 @@ sample_metadata_csv <- arg_value("--metadata", default_metadata)
 output_dir <- arg_value("--out-dir", file.path(project_root, "results", "figure1d"))
 # Reuse a lossless sparse cache because reparsing the 4+ GB CSV is expensive.
 sparse_dir <- arg_value("--sparse-dir", file.path(output_dir, "sparse_cache"))
+# Allow an exact continuation from a validated sparse cache when the raw GEO CSV
+# remains archived elsewhere and is intentionally absent from the compute VM.
+cache_only <- has_arg("--cache-only")
 # Point to the streaming Python converter maintained beside this script.
 converter <- file.path(script_dir, "prepare_gse200164_sparse.py")
 # Match the authors' Louvain resolution unless explicitly overridden.
@@ -177,8 +180,13 @@ if (!is.null(max_cells_per_sample) &&
   stop("--max-cells-per-sample must be at least 50")
 }
 
-# Require all source files before beginning an hours-long integration.
-for (path in c(counts_csv, sample_metadata_csv, converter)) {
+# Cache-only execution still needs the converter script for provenance, but it
+# deliberately does not require raw counts or source metadata on the VM.
+required_input_paths <- if (cache_only) converter else c(
+  counts_csv, sample_metadata_csv, converter
+)
+# Require the inputs needed for the selected execution mode before integration.
+for (path in required_input_paths) {
   # Name the exact missing path in the error shown to the user.
   if (!file.exists(path)) stop("Required input does not exist: ", path)
 }
@@ -202,8 +210,24 @@ required_sparse_files <- file.path(sparse_dir, c(
   ".sparse_cache_complete"
 ))
 
+# A cache-only run may never regenerate a cache because doing so requires the
+# deliberately omitted raw source files.
+if (cache_only && has_arg("--rebuild-sparse")) {
+  stop("--cache-only cannot be combined with --rebuild-sparse")
+}
+
+# Stop clearly when a VM transfer omitted any cache artifact needed to resume.
+if (cache_only && !all(file.exists(required_sparse_files))) {
+  stop(
+    "--cache-only requires a complete sparse cache; missing: ",
+    paste(basename(required_sparse_files[!file.exists(required_sparse_files)]),
+          collapse = ", ")
+  )
+}
+
 # Rebuild when any component is missing or when the user requests fresh input.
-if (!all(file.exists(required_sparse_files)) || has_arg("--rebuild-sparse")) {
+if (!cache_only && (!all(file.exists(required_sparse_files)) ||
+                    has_arg("--rebuild-sparse"))) {
   # Tell the user why this one-time conversion can take several minutes.
   message("Building a lossless sparse cache from the 4+ GB GEO count table.")
   # Quote path arguments because this workspace and the uploaded data folders contain spaces.
@@ -300,6 +324,20 @@ if (!is.null(max_cells_per_sample)) {
 }
 
 # Build a parameter record used to detect incompatible checkpoint reuse.
+# Do not resolve absent raw-data paths on a cache-only VM.  The existing
+# checkpoint and cache manifest retain the original source provenance instead.
+source_parameter_values <- if (cache_only) {
+  c("<cache-only>", NA_character_, NA_character_, "<cache-only>")
+} else {
+  c(
+    normalizePath(counts_csv),
+    as.character(file.info(counts_csv)$size),
+    as.character(file.info(counts_csv)$mtime),
+    normalizePath(sample_metadata_csv)
+  )
+}
+
+# Build the run settings that determine whether a checkpoint is compatible.
 analysis_parameters <- data.frame(
   parameter = c(
     "counts_path", "counts_size", "counts_mtime", "metadata_path",
@@ -308,10 +346,7 @@ analysis_parameters <- data.frame(
     "max_cells_per_sample", "seurat_version"
   ),
   value = c(
-    normalizePath(counts_csv),
-    as.character(file.info(counts_csv)$size),
-    as.character(file.info(counts_csv)$mtime),
-    normalizePath(sample_metadata_csv),
+    source_parameter_values,
     as.character(resolution),
     paste(range(dims), collapse = ":"),
     paste(range(integration_dims), collapse = ":"),
@@ -330,16 +365,33 @@ parameter_path <- file.path(output_dir, "analysis_parameters.csv")
 if (file.exists(parameter_path) && !has_arg("--rebuild-analysis")) {
   # Read the exact parameter table used by the previous analysis run.
   previous_parameters <- read_csv(parameter_path, show_col_types = FALSE)
+  # A cache-only VM has a different filesystem path for archived raw inputs;
+  # compare biological and computational settings while retaining the original
+  # raw-source provenance in the cache manifest and existing parameter record.
+  source_parameter_names <- c(
+    "counts_path", "counts_size", "counts_mtime", "metadata_path"
+  )
+  compared_parameters <- if (cache_only) {
+    analysis_parameters$parameter %!in% source_parameter_names
+  } else {
+    rep(TRUE, nrow(analysis_parameters))
+  }
   # Compare values after normalizing both inputs to base data frames.
-  if (!identical(as.data.frame(previous_parameters), analysis_parameters)) {
+  if (!identical(
+    as.data.frame(previous_parameters[compared_parameters, , drop = FALSE]),
+    analysis_parameters[compared_parameters, , drop = FALSE]
+  )) {
     stop(
       "Analysis parameters changed. Re-run with --rebuild-analysis to replace ",
       "incompatible checkpoints."
     )
   }
 }
-# Write or refresh the parameter record before starting the expensive stages.
-write_csv(analysis_parameters, parameter_path)
+# Preserve the original raw-source parameter record during a cache-only resume;
+# it remains the audit trail linking this cache to the archived GEO files.
+if (!cache_only || !file.exists(parameter_path)) {
+  write_csv(analysis_parameters, parameter_path)
+}
 
 # Name checkpoints for the QC, integrated, and final annotated stages.
 qc_checkpoint <- file.path(output_dir, "checkpoint_qc_seurat.rds")

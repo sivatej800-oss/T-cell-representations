@@ -37,6 +37,10 @@ Use `--rebuild-sparse` only when the source matrix changes. Use
 `--rebuild-analysis` when analysis parameters change and existing checkpoints
 must be replaced.
 
+To move a paused run to a VM without copying the raw 4.4 GB count CSV, transfer
+the validated sparse cache and saved checkpoints, then resume with
+`--cache-only`. This mode verifies the cache but never attempts to rebuild it.
+
 ## Local data layout
 
 The scripts recognize either of these local layouts:
