@@ -18,6 +18,9 @@
 # Seurat 4.1.0 workflow during SplitObject and SCT integration.
 options(Seurat.object.assay.version = "v3")
 
+# Readable inverse of base R's membership operator for parameter validation.
+`%!in%` <- function(x, table) !(x %in% table)
+
 # Load only packages directly used by this reproducible workflow.
 suppressPackageStartupMessages({
   # Matrix stores gene-by-cell expression without expanding millions of zeros.
@@ -377,10 +380,16 @@ if (file.exists(parameter_path) && !has_arg("--rebuild-analysis")) {
     rep(TRUE, nrow(analysis_parameters))
   }
   # Compare values after normalizing both inputs to base data frames.
-  if (!identical(
-    as.data.frame(previous_parameters[compared_parameters, , drop = FALSE]),
-    analysis_parameters[compared_parameters, , drop = FALSE]
-  )) {
+  # CSV reads receive fresh sequential row names, whereas subsetting the
+  # in-memory table retains its original indices.  Compare the actual fields,
+  # not this incidental row-name attribute.
+  previous_compared <- as.data.frame(
+    previous_parameters[compared_parameters, , drop = FALSE]
+  )
+  current_compared <- analysis_parameters[compared_parameters, , drop = FALSE]
+  rownames(previous_compared) <- NULL
+  rownames(current_compared) <- NULL
+  if (!identical(previous_compared, current_compared)) {
     stop(
       "Analysis parameters changed. Re-run with --rebuild-analysis to replace ",
       "incompatible checkpoints."
@@ -468,11 +477,24 @@ qc_summary <- s@meta.data %>%
 write_csv(qc_summary, file.path(output_dir, "qc_summary_by_sample.csv"))
 
 # Resume from SCT integration when a compatible checkpoint already exists.
+integrated_checkpoint_loaded <- FALSE
 if (file.exists(integrated_checkpoint) && !has_arg("--rebuild-analysis")) {
-  # Load the most expensive completed analysis stage.
+  # An interrupted serialization can leave a truncated checkpoint.  Retain the
+  # valid anchor checkpoint and recompute integration instead of blocking resume.
   message("Loading SCT integration checkpoint: ", integrated_checkpoint)
-  s <- readRDS(integrated_checkpoint)
-} else {
+  s <- tryCatch(
+    readRDS(integrated_checkpoint),
+    error = function(error) {
+      warning(
+        "Ignoring unreadable SCT integration checkpoint: ", conditionMessage(error),
+        ". Recomputing integration from SCT anchors."
+      )
+      NULL
+    }
+  )
+  integrated_checkpoint_loaded <- !is.null(s)
+}
+if (!integrated_checkpoint_loaded) {
   # Reuse a completed anchor set when only a later Seurat compatibility step failed.
   if (file.exists(anchors_checkpoint) && !has_arg("--rebuild-analysis")) {
     # Loading the anchors also restores the prepared per-sample object list they contain.
@@ -547,8 +569,13 @@ if (file.exists(integrated_checkpoint) && !has_arg("--rebuild-analysis")) {
   rm(anchors)
   # Reclaim their memory before serializing the integrated checkpoint.
   invisible(gc())
-  # Save the exact integrated object used for all downstream clustering.
-  saveRDS(s, integrated_checkpoint, compress = FALSE)
+  # Serialize to a temporary file, then replace the checkpoint only when the
+  # write succeeded, so an interruption cannot invalidate a completed resume.
+  integrated_checkpoint_tmp <- paste0(integrated_checkpoint, ".tmp")
+  saveRDS(s, integrated_checkpoint_tmp, compress = FALSE)
+  if (!file.rename(integrated_checkpoint_tmp, integrated_checkpoint)) {
+    stop("Could not promote completed SCT integration checkpoint into place.")
+  }
 }
 
 # Use the harmonized assay for the global Figure 1D embedding and clusters.
@@ -849,7 +876,8 @@ write_csv(t_validation, file.path(output_dir, "tcell_annotation_validation.csv")
 
 # Recluster the broad monocyte compartment to reproduce its three expression states.
 message("Reclustering the broad monocyte compartment.")
-monocytes <- recluster_compartment(s, "Monocytes", dims, resolution, seed)
+if (any(s$cluster_ident == "Monocytes")) {
+  monocytes <- recluster_compartment(s, "Monocytes", dims, resolution, seed)
 # Preserve actual Seurat IDs rather than their one-based R factor codes.
 monocyte_cluster_ids <- as.character(monocytes$seurat_clusters)
 # Add an aligned monocyte-subcluster column to the all-cell object.
@@ -923,6 +951,26 @@ write_csv(
   monocyte_validation,
   file.path(output_dir, "monocyte_annotation_validation.csv")
 )
+} else {
+  # Tiny smoke subsets can omit a broad lineage after marker-score fallback.
+  # This is not a valid reason to discard the completed global embedding.
+  warning("No cells were assigned to Monocytes; skipping monocyte reclustering for this run.")
+  s$seurat_clusters_monocytes <- NA_character_
+  write_csv(
+    data.frame(
+      cluster = character(), signature = character(), z_score = numeric(),
+      mean_expression = numeric(), present_markers = character()
+    ),
+    file.path(output_dir, "monocyte_subcluster_marker_scores.csv")
+  )
+  write_csv(
+    data.frame(
+      cluster = character(), author_label = character(),
+      strongest_marker_signature = character(), marker_agrees = logical()
+    ),
+    file.path(output_dir, "monocyte_annotation_validation.csv")
+  )
+}
 
 # Correct the typographical "Monoctyes" label in the authors' public code/figure key.
 celltype_levels <- c(
@@ -1057,19 +1105,23 @@ ggsave(
   file.path(diagnostics_dir, "tcell_reclustering_umap.pdf"),
   t_diagnostic, width = 6, height = 5, useDingbats = FALSE
 )
-# Draw monocyte subcluster IDs to inspect the second hierarchical stage.
-monocyte_diagnostic <- DimPlot(
-  monocytes, group.by = "seurat_clusters", reduction = "umap",
-  label = TRUE, shuffle = TRUE, pt.size = 0.4
-)
-# Save the monocyte diagnostic plot at the same review size.
-ggsave(
-  file.path(diagnostics_dir, "monocyte_reclustering_umap.pdf"),
-  monocyte_diagnostic, width = 6, height = 5, useDingbats = FALSE
-)
+# Draw monocyte subcluster IDs to inspect the second hierarchical stage when
+# the current input contains a monocyte compartment.
+if (exists("monocytes")) {
+  monocyte_diagnostic <- DimPlot(
+    monocytes, group.by = "seurat_clusters", reduction = "umap",
+    label = TRUE, shuffle = TRUE, pt.size = 0.4
+  )
+  # Save the monocyte diagnostic plot at the same review size.
+  ggsave(
+    file.path(diagnostics_dir, "monocyte_reclustering_umap.pdf"),
+    monocyte_diagnostic, width = 6, height = 5, useDingbats = FALSE
+  )
+}
 
 # Remove compartment copies before serializing the already complete all-cell object.
-rm(t_cells, monocytes)
+rm(t_cells)
+if (exists("monocytes")) rm(monocytes)
 # Reclaim their assays and reductions to reduce peak final-save memory.
 invisible(gc())
 # Save the full annotated object so no downstream user must rerun integration.
