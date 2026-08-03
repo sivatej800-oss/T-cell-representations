@@ -1,24 +1,73 @@
+# Operating-system and editor files
 .DS_Store
-.venv-ad-analysis-py313/
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/*.log
+
+# Python
+.venv/
+.venv-*/
+venv/
+env/
 __pycache__/
 *.py[cod]
-data/ad_datasets/*
-!data/ad_datasets/.gitkeep
-data/download_family/*
-!data/download_family/.gitkeep
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
 
-# Alternate folder names used by the locally uploaded GEO files.
-data/AD datasets/*
-data/download family/*
+# R
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+renv/library/
+renv/staging/
+renv/cache/
 
-# Generated R environments and package caches
-code/csf_aging/renv/library/
-code/csf_aging/renv/staging/
-code/csf_aging/renv/cache/
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+logs/
 
-# Large generated sparse-matrix cache
-results/figure1d/sparse_cache/
+# Raw and derived single-cell data
+Age_trajectory/*
+!Age_trajectory/README.md
+data/*
+!data/README.md
+*.h5ad
+*.h5
+*.hdf5
+*.loom
+*.mtx
+*.mtx.gz
+*.npz
+*.npy
+*.rds
+*.rda
+*.rdata
 
-# Figure recreation artifacts and smoke-test checkpoints are reproducible outputs.
-results/figure1d/*
-results/figure1d_smoke/*
+# Model artifacts and large generated outputs
+results/
+outputs/
+checkpoints/
+models/
+wandb/
+mlruns/
+
+# Common downloaded archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.gz
+*.bz2
+*.xz
+
+# Keep placeholder files in otherwise ignored output folders when explicitly added.
+!**/.gitkeep

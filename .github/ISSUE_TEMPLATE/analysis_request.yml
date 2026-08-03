@@ -1,0 +1,24 @@
+name: Analysis request
+description: Propose a new representation, dataset, evaluation, or workflow improvement.
+title: "[Analysis]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Research question
+      description: What question should the proposed work answer?
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Proposed approach
+      description: Describe the inputs, method, comparison, and expected output.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Completion criteria
+      description: What evidence would make this work complete?

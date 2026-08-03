@@ -1,56 +1,76 @@
-# Summer Project 2026
+# T Cell Representations
 
-This repository contains a reproducible recreation of Figure 1D from Piehl et
-al., *Cell* 2022, using the deposited GSE200164 CSF single-cell expression data.
+Research workflows for constructing and evaluating single-cell T-cell representations from cerebrospinal-fluid (CSF) transcriptomic data. The current work focuses on the public [GSE200164](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE200164) dataset and the Figure 1D analysis from Piehl et al. (2022).
 
-## Figure 1D recreation
+## Project status
 
-The corrected workflow is implemented in:
+This is an active research repository. The notebooks capture data auditing, AnnData construction, Seurat-based Figure 1D reproduction, and early representation-learning experiments. Generated matrices and model checkpoints are intentionally not versioned.
 
-- `code/test_code/prepare_gse200164_sparse.py` — losslessly converts the wide
-  SoupX-adjusted GEO table to a reusable sparse matrix without rounding its
-  fractional values.
-- `code/test_code/generate_fig1d_umap.R` — applies the authors' per-sample SCT
-  integration, PCA, Louvain clustering, UMAP, hierarchical T-cell/monocyte
-  reclustering, marker validation, and plotting workflow.
-- `FIGURE1D_REPRODUCTION.md` — records the audit findings, methods mapping,
-  expected outputs, and limitations of the deposited processed matrix.
+## Repository layout
 
-Run the complete 70,391-cell analysis from the repository root:
-
-```bash
-Rscript code/test_code/generate_fig1d_umap.R
+```text
+.
+├── notebooks/
+│   ├── data_preparation/   # Download, audit, and AnnData construction
+│   ├── figure1d/           # Figure 1D preparation and reproduction
+│   ├── experiments/        # Superseded or diagnostic experiments
+│   └── utilities/          # Data-transfer and integrity checks
+├── Age_trajectory/         # Local generated data, results, and QC artifacts
+├── code/scGPT-main/        # Vendored scGPT research code used by experiments
+├── scripts/                # Repository integrity checks
+├── data/                   # Local-only data area; see data/README.md
+└── requirements.txt        # Core Python notebook dependencies
 ```
 
-The first run creates a sparse cache and analysis checkpoints under
-`results/figure1d/`. Later runs reuse compatible checkpoints. To test the
-workflow quickly while retaining all 59 samples, use a separate output folder:
+## Notebook workflow
+
+Run the notebooks in this order when rebuilding the analysis:
+
+1. `notebooks/data_preparation/01_download_audit_build_anndata.ipynb`
+2. `notebooks/figure1d/02_prepare_figure1d.ipynb`
+3. `notebooks/figure1d/03_reproduce_figure1d.ipynb`
+4. `notebooks/utilities/validate_canonical_data_transfer.ipynb` when moving a canonical AnnData file between systems
+
+The notebook under `notebooks/experiments/` is retained as a documented failed attempt and is not part of the canonical workflow.
+
+## Setup
+
+Python 3.10 or newer is recommended.
 
 ```bash
-Rscript code/test_code/generate_fig1d_umap.R \
-  --max-cells-per-sample=50 \
-  --sparse-dir=results/figure1d/sparse_cache \
-  --out-dir=results/figure1d_smoke
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python -m ipykernel install --user --name t-cell-representations
 ```
 
-Use `--rebuild-sparse` only when the source matrix changes. Use
-`--rebuild-analysis` when analysis parameters change and existing checkpoints
-must be replaced.
+The Figure 1D reproduction also requires R with `Seurat`, `Matrix`, `glmGamPoi`, `future`, `dplyr`, `ggplot2`, `patchwork`, and `readr`.
 
-To move a paused run to a VM without copying the raw 4.4 GB count CSV, transfer
-the validated sparse cache and saved checkpoints, then resume with
-`--cache-only`. This mode verifies the cache but never attempts to rebuild it.
+Several notebooks currently define an absolute project path near the top. Update that single configuration cell for your checkout before running the workflow. Keep the full expression matrix sparse; converting the complete matrix to a dense array requires impractical memory.
 
-## Local data layout
+## Data
 
-The scripts recognize either of these local layouts:
+The analysis uses GSE200164, comprising 70,391 cells and 19,689 genes across 59 samples in the processed matrix. Raw downloads, sparse matrices, AnnData objects, Seurat objects, and checkpoints are excluded from Git. See [data/README.md](data/README.md) for the expected local data policy.
 
-- `data/AD datasets/GSE200164_counts.csv` and
-  `data/AD datasets/GSE200164_metadata.csv`
-- `data/ad_datasets/GSE200164_counts.csv` and
-  `data/ad_datasets/GSE200164_metadata.csv`
+## Validation
 
-Large data and generated results are intentionally ignored by Git.
+Run the repository check before committing:
 
-The authors' uploaded reference repository is available under
-`code/csf_aging-main/`; the recreation does not modify it.
+```bash
+python scripts/check_repository.py
+```
+
+It verifies notebook JSON, checks for accidentally tracked generated artifacts, and enforces GitHub's practical per-file size boundary.
+
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the research workflow and [SECURITY.md](SECURITY.md) for responsible disclosure and data-handling guidance.
+
+## Citation
+
+If this repository contributes to published work, cite the underlying dataset and methods paper:
+
+> Piehl N, et al. Cerebrospinal fluid immune dysregulation during healthy brain aging and cognitive impairment. *Cell*. 2022. https://doi.org/10.1016/j.cell.2022.11.019
+
+No license has been granted yet. Until a license is added, reuse requires permission from the repository owner.
