@@ -38,8 +38,6 @@ logs/
 # Raw and derived single-cell data
 Age_trajectory/*
 !Age_trajectory/README.md
-data/*
-!data/README.md
 *.h5ad
 *.h5
 *.hdf5

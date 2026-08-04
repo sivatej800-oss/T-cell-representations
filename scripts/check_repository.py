@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Validate repository hygiene without requiring project dependencies."""
+"""Validate repository hygiene without loading scientific project dependencies.
+
+This lightweight check is suitable for both local use and GitHub Actions. It prevents
+large generated data from entering Git and confirms archived notebooks remain valid
+JSON documents.
+"""
 
 from __future__ import annotations
 
@@ -9,6 +14,7 @@ import sys
 from pathlib import Path
 
 
+# GitHub rejects files at 100 MiB, so 95 MiB leaves a small safety margin.
 ROOT = Path(__file__).resolve().parents[1]
 MAX_FILE_BYTES = 95 * 1024 * 1024
 GENERATED_SUFFIXES = {
@@ -25,6 +31,8 @@ GENERATED_SUFFIXES = {
 
 
 def tracked_files() -> list[Path]:
+    """Return staged/tracked files plus visible untracked files for pre-commit checks."""
+
     result = subprocess.run(
         ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
         cwd=ROOT,
@@ -36,6 +44,8 @@ def tracked_files() -> list[Path]:
 
 
 def main() -> int:
+    """Collect all hygiene errors, print them together, and return a shell status."""
+
     errors: list[str] = []
     files = tracked_files()
 
@@ -49,6 +59,8 @@ def main() -> int:
         if path.suffix.lower() in GENERATED_SUFFIXES:
             errors.append(f"generated data artifact: {relative}")
 
+    # A notebook can be valid JSON but still be incomplete, so check its two required
+    # top-level fields after parsing.
     notebooks = sorted(
         path for path in files if path.suffix == ".ipynb" and path.is_file()
     )
