@@ -217,66 +217,66 @@ for (celltype in celltypes) {
   # Define celltype label
   cell_type_label <- gsub("/", "", cell_type)
   cell_type_label <- gsub(" ", "_", cell_type_label)
-
+  
   # Initialize output directory
   celltype_dir <- paste0(output_dir, "/", celltype_label, "_reclustering/")
   dir.create(celltype_dir, showWarnings = FALSE)
-
+  
   # Subset celltype
   s_celltype <- subset(s, cluster_ident == celltype)
   print(s_celltype)
-
+  
   #------------------------------------------------------------------------------
   # Visualize PCA on celltype only
-
+  
   # Set assay to integrated
   DefaultAssay(object = s_celltype) <- "integrated"
-
+  
   # Re-calculate variable features
   s_celltype <- FindVariableFeatures(s_celltype, assay = "integrated")
-
+  
   # Generate PCA
   s_celltype <- RunPCA(object = s_celltype)
-
+  
   # Initialize identities to look at on PCA
   idents <- c("ID", "age", "sort_day", "sort_round", "Diagnosis")
-
+  
   # Plot PCA for each identity
   for (ident in idents) {
     s_celltype <- SetIdent(s_celltype, value = ident)
-
+    
     myplot <- DimPlot(s_celltype, reduction = "pca", pt.size = 2, shuffle = TRUE)
-
+    
     set_panel_size(myplot,
                    file = paste0(celltype_dir, "PCA_", ident, ".pdf"),
                    width = unit(5, "in"), height = unit(4, "in")
     )
   }
-
+  
   # Visualize PC Dimensionality of Dataset
   myplot <- ElbowPlot(s_celltype)
   set_panel_size(myplot,
                  file = paste0(celltype_dir, "/Elbowplot.pdf"),
                  width = unit(5, "in"), height = unit(4, "in")
   )
-
+  
   #------------------------------------------------------------------------------
   # Clustering and UMAP visualization on celltype only
-
+  
   # Cluster Cells on SCT integrated assay
   s_celltype <- FindNeighbors(s_celltype, dims = 1:15)
   s_celltype <- FindClusters(s_celltype, resolution = 0.3)
-
+  
   # Run UMAP on SCT integrated assay
   s_celltype <- RunUMAP(s_celltype, dims = 1:15, n.neighbors = 30)
-
+  
   # Clustering done on integrated assay, but visualize expression with SCT
   DefaultAssay(object = s_celltype) <- "SCT"
-
+  
   # List cell type markers
   markers <- c("CD3D", "CD4", "CD8A", "CD8B", "FOXP3",
                "CD14", "FCGR3A", "CD68")
-
+  
   # Plot markers
   for (marker in markers) {
     if (marker %!in% rownames(GetAssayData(s_celltype))) {
@@ -292,10 +292,10 @@ for (celltype in celltypes) {
                    width = unit(5, "in"), height = unit(4, "in")
     )
   }
-
+  
   # Add to identities
   idents <- c(idents, "seurat_clusters", "clonal")
-
+  
   # Visualize each identity on UMAP
   for (ident in idents) {
     s_celltype <- SetIdent(s_celltype, value = ident)
@@ -305,10 +305,10 @@ for (celltype in celltypes) {
                    width = unit(5, "in"), height = unit(4, "in")
     )
   }
-
+  
   # Set Ident to seurat clusters
   s_celltype <- SetIdent(s_celltype, value = "seurat_clusters")
-
+  
   if (celltype == "T Cells") {
     # Save seurat clusters for celltype
     # Changed cluster nums to +1 because of weird transformation
@@ -318,7 +318,7 @@ for (celltype in celltypes) {
     ] <- s_celltype@meta.data$seurat_clusters
     print(table(s@meta.data$seurat_clusters_tcells))
     print(table(s_celltype@meta.data$seurat_clusters))
-
+    
     # Assign cell types
     s@meta.data$cluster_ident[
       which(s@meta.data$seurat_clusters_tcells %in% c("3"))
@@ -332,7 +332,7 @@ for (celltype in celltypes) {
     s@meta.data$cluster_ident[
       which(s@meta.data$seurat_clusters_tcells %in% c("6"))
     ] <- "T Regulatory Cells"
-
+    
   } else if (celltype == "Monocytes") {
     # Save seurat clusters for celltype
     s@meta.data$seurat_clusters_monocytes <- "NA"
@@ -341,7 +341,7 @@ for (celltype in celltypes) {
     ] <- s_celltype@meta.data$seurat_clusters
     print(table(s@meta.data$seurat_clusters_monocytes))
     print(table(s_celltype@meta.data$seurat_clusters))
-
+    
     # Assign cell types
     # Changed cluster nums to +1 because of weird transformation
     s@meta.data$cluster_ident[
@@ -353,9 +353,9 @@ for (celltype in celltypes) {
     s@meta.data$cluster_ident[
       which(s@meta.data$seurat_clusters_monocytes %in% c("4", "5", "6"))
     ] <- "CD14+/CD16+/CD68mid Monocytes"
-
+    
   }
-
+  
   # Print cluster markers
   cluster_markers <- FindAllMarkers(s_celltype, min.pct = 0.25, logfc.threshold = 0.25)
   write.csv(cluster_markers, paste0(celltype_dir, "seurat_cluster_markers.csv"))
@@ -425,7 +425,7 @@ p <- DoHeatmap(s_sub,
                  "CD19", "JCHAIN", "CD44"
                )),
                slot = "data",
-               assay = "RNA") +
+               assay = "RNA") + 
   scale_fill_gradientn(colors = c("white", "darkorchid2", "navy")) +
   theme(plot.margin = unit(c(3,2,1,1), "cm"),
         legend.position = "bottom")

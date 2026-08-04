@@ -8,4 +8,4 @@ The reference script is not an executable project entry point: it contains place
 paths, depends on unpublished helper functions and metadata fields, and includes
 downstream analyses that are outside the maintained pipeline. The core reproducible
 parameters have been incorporated into
-`../../scripts/figure1d_pipeline/run_seurat_figure1d.R`.
+`../../scripts/03_reproduce_figure1d.R`.
