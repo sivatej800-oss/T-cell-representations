@@ -5,16 +5,27 @@
 1. Create a branch from `main` using a short descriptive name.
 2. Use a project-specific virtual environment and install `requirements.txt`.
 3. Keep raw data and generated analysis artifacts in the ignored local directories.
-4. Clear sensitive outputs from notebooks before sharing them.
-5. Run `python scripts/check_repository.py` before opening a pull request.
+4. Keep the numbered Python entry points thin and put reusable behavior in `scripts/figure1d_pipeline/`.
+5. Run `python3 scripts/check_repository.py` before opening a pull request.
 
-## Notebook changes
+## Pipeline changes
 
-- Keep configuration and input paths in an early, clearly labelled cell.
 - Record dataset accessions, random seeds, package versions, and material parameters.
 - Preserve sparse matrices throughout the full-data workflow.
-- Add a short Markdown explanation when a result changes scientific interpretation.
-- Place superseded exploratory work under `notebooks/experiments/` rather than mixing it into the canonical workflow.
+- Keep generated-data paths relative to the configured workspace; do not add machine-specific absolute paths.
+- Add validations at artifact boundaries so interrupted stages can resume safely.
+- Update `scripts/README.md` when stage inputs, outputs, or checkpoint behavior change.
+
+## Notebook and reference changes
+
+- Treat everything under `archive/` as historical provenance rather than maintained
+  pipeline code.
+- Place additional superseded or diagnostic notebooks under `archive/notebooks/`.
+- Store supplied external analysis code under `archive/references/`, not among
+  executable scripts.
+- Keep unused third-party source snapshots under `archive/vendor/`; active dependencies
+  belong in `requirements.txt` or should be installed through R.
+- Document any scientific interpretation changes in the root README or a focused reference note.
 
 ## Pull requests
 
