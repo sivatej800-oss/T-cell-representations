@@ -15,16 +15,18 @@
 - Preserve sparse matrices throughout the full-data workflow.
 - Keep generated-data paths relative to the configured workspace; do not add machine-specific absolute paths.
 - Add validations at artifact boundaries so interrupted stages can resume safely.
-- Update `scripts/README.md` when a stage's sequential logic, inputs, outputs, or
-  checkpoint behavior changes.
+- Keep each stage's step comments accurate when its logic, inputs, outputs, or
+  checkpoint behavior changes. Those comments are the per-stage documentation; there
+  is no separate file describing what the scripts do.
 
 ## Notebook and reference changes
 
 - Treat everything under `archive/` as historical provenance rather than maintained
   pipeline code.
 - Place additional superseded or diagnostic notebooks under `archive/notebooks/`.
-- Store supplied external analysis code under `archive/references/`, not among
-  executable scripts.
+- Keep the paper authors' own code (`figure1d_author_workflow.R` and
+  `author_preprocessing/`) separate from `scripts/`. It is reference material that
+  documents what the published analysis did; it is never run by this pipeline.
 - Keep unused third-party source snapshots under `archive/vendor/`; active dependencies
   belong in `requirements.txt` or should be installed through R.
 - Document any scientific interpretation changes in the root README or a focused reference note.

@@ -49,6 +49,12 @@ integration features, `dims = 1:30`, 50 PCs, `algorithm = 1`. The authors left t
 unspecified; they are written out here for readability. The genuinely chosen values
 are 1,000 variable features, resolution 0.3, and `dims = 1:15`.
 
+**The three stages repeat their path and validation helpers on purpose.** They import
+nothing from each other, so each file can be read and run on its own. This trades some
+duplication for the ability to understand one stage without tracing across files.
+Factoring the shared parts into a module would be the conventional move; it is not
+wanted here.
+
 ## Environment
 
 - Python: `.venv/` in this directory. Note `~/.venvs/jupyter` also exists and is the
