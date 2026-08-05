@@ -184,7 +184,7 @@ Which 800 is what matters. Candidates rank by how many samples each gene varies 
 | pipeline requesting 2,000 features | 11 | 671 cells |
 | notebook run on the full pool | 12 | 120 cells |
 
-Stage 03 now requests 3,000, which returns the pool entire. **The corrected pipeline has not yet been re-run end to end** — the 12-cluster row above comes from a notebook run over the identical matrix (`edited_good_reproduction.md`), not from this pipeline.
+Stage 03 now requests 3,000, which returns the pool entire. **The corrected pipeline has since been re-run end to end and returned 12 clusters**, matching the notebook run over the identical matrix (`edited_good_reproduction.md`) that first produced that number.
 
 Two further differences were corrected at the same time. PCA computed 50 components where that reference run computed 30; the decomposition is iterative rather than exact, so the count perturbs the 15 components actually used. And `DimPlot` painted all 70,391 cells onto a 512 × 512 grid before stretching it across a 2,700 × 2,100 image, washing the figure out for reasons that have nothing to do with the analysis.
 
@@ -197,37 +197,69 @@ Two decisions stand:
 
 Cluster count is treated as a diagnostic rather than a target. A run that returns no small clusters is evidence that rare cell types were lost during feature selection, and that is where to look.
 
-## Future scGPT comparison
+## Stage 04 — the scGPT comparison
 
-The next comparison replaces the PCA-based cell representation with a frozen scGPT embedding, keeping everything downstream as similar as possible.
+This arm replaces the PCA-based cell representation with a frozen scGPT embedding and keeps everything downstream identical. It has been run: `scripts/04_scgpt_figure1d.py` starts `04_scgpt_figure1d.R`, and the results are in `Age_trajectory/results/figure1d_scgpt/`.
 
 ```mermaid
 flowchart TD
-    A[("same AnnData object<br/>same cells, same metadata")]
+    A[("same 70,391 cells<br/>same metadata, same cell order")]
 
-    B["SCTransform integration"]
-    C["<b>PCA</b><br/>PCs 1–15"]
+    B["SCTransform integration<br/>59 samples, 3,000 features"]
+    C["<b>PCA</b> · PCs 1–15"]
 
-    D["frozen <b>scGPT</b> embedding<br/>one vector per cell<br/><code>adata.obsm[&quot;X_scgpt&quot;]</code>"]
+    D["frozen <b>scGPT</b> whole-human<br/>512 dimensions per cell<br/>15,960 of 19,689 genes in vocabulary"]
 
     E["nearest-neighbor graph"]
     F["nearest-neighbor graph"]
-    G["clustering · same resolution target"]
-    H["clustering · same resolution target"]
-    I["UMAP · same n.neighbors"]
-    J["UMAP · same n.neighbors"]
+    G["Louvain · resolution 0.3"]
+    H["Louvain · resolution 0.3"]
+    I["UMAP · n.neighbors 30"]
+    J["UMAP · n.neighbors 30"]
+
+    L["<b>12 clusters</b>"]
+    M["<b>13 clusters</b>"]
 
     K(["<b>compare on the same cells</b><br/>cluster stability · separation of broad populations<br/>donor mixing · marker-gene agreement<br/>recovery of rare and transitional populations"])
 
-    A --> B --> C --> E --> G --> I --> K
-    A --> D --> F --> H --> J --> K
+    A --> B --> C --> E --> G --> I --> L --> K
+    A --> D --> F --> H --> J --> M --> K
 
     style C fill:#dbe8f5,stroke:#4a6a8a
     style D fill:#f0dbe8,stroke:#8a4a6a
     style K fill:#d4e8d4,stroke:#4a7a4a
 ```
 
-Only the representation differs. The graph clustering, UMAP, and biological interpretation steps stay parallel.
+Only the representation differs. Both arms run the same Seurat 5.5.1 code at the same settings with the same seed, so a difference in the result points at the representation rather than at the tooling.
+
+**One departure is unavoidable.** Stage 03 takes principal components 1–15, which is meaningful because PCA orders its output by variance captured — the tail is discardable noise. An scGPT embedding has no such ordering: its 512 dimensions are learned jointly and none is privileged, so there is no leading 15 to take. All 512 are used, as these embeddings are normally consumed. The vectors are unit length, so no dimension dominates the distance through scale alone.
+
+**The two arms skip very different amounts of work.** Stage 04 runs only the bottom row of the diagram — no SCTransform, no anchor finding, no integration, no PCA. It finished in about 7 minutes against Stage 03's roughly 90, but the comparison is not like for like: the embedding itself cost 618 seconds on an L4 GPU in a separate session. The deeper difference is that scGPT never performs explicit batch correction. It is trusted to place a CD8 T cell in a similar region regardless of which of the 59 samples it came from, because it was pretrained across tens of millions of cells. That assumption is one of the things this comparison exists to test — if the scGPT clusters segregate by `internal_sample_id`, the speed came at the cost of uncorrected batch effects.
+
+### The genes scGPT never saw
+
+scGPT does not consume expression as a vector in the dataset's column order. It reads genes as tokens looked up in a vocabulary frozen at pretraining. Of this dataset's 19,689 gene symbols, **15,960 (81.1%) matched a token and 3,729 did not** — and the unmatched ones were dropped before the model saw a single cell. Because this is a frozen zero-shot embedding, nothing downstream compensates.
+
+That made the loss look severe, and it is worth recording why it is not, because the raw gene count is misleading by a factor of sixteen.
+
+**Which genes were dropped.** The vocabulary is in this repository at `archive/vendor/scGPT-main/scgpt/tokenizer/default_census_vocab.json`. Its 60,694 tokens reproduce the run's split exactly — 15,960 matched, 3,729 dropped — which identifies it as the gene content the run used, even though the model's own `vocab.json` carries a different checksum for prepending special tokens. The dropped set is 3,420 clone-based loci (`AC016831.7`), about 110 further lncRNAs, antisense transcripts, pseudogenes and uncharacterized ORFs, and **198 conventional HGNC-style symbols**. Not one of 65 canonical CSF and immune markers was dropped; `PPBP`, `HBB`, `PF4` and `SDC1` are absent from the dataset itself, unrelated to scGPT.
+
+The 198 conventional symbols are nomenclature drift, not missing biology. The dataset's names come from a GRCh38 CellRanger reference predating HGNC renames the vocabulary already reflects — roughly 90 histone genes (`HIST1H2BK` → `H2BC12`, `H3F3B` → `H3-3B`), about 20 aminoacyl-tRNA synthetases that gained a numeric suffix (`AARS` → `AARS1`), the membrane-associated RING finger genes renamed away from Excel date coercion (`MARCH1` → `MARCHF1`), and characterized genes that outgrew placeholder names (`TMEM173` → `STING1`, `FAM49A` → `CYRIA`). scGPT knows every one of these genes under its current symbol.
+
+**How much signal was lost.** Counting genes weights a never-expressed clone-based locus the same as a histone transcribed in every cell, so the more honest measure sums the expression behind each side of the split. Over the matrix scGPT actually ingested:
+
+| | genes | share of total expression |
+| --- | --- | --- |
+| kept | 15,960 (81.1%) | **98.862%** |
+| dropped | 3,729 (18.9%) | **1.138%** |
+
+**scGPT retained 98.86% of the transcriptomic signal.** The dropped 1.1% is concentrated rather than diffuse: the top 20 dropped genes carry 47.6% of it, and they are almost entirely the renamed histones — `H3F3B` alone accounts for 0.148% of all expression in the dataset, an eighth of everything lost. The 3,420 clone-based loci together contribute less than the histone cluster, and 81 dropped genes have no expression anywhere at all.
+
+**What this settles.** The concern that motivated the check was that a rare-population marker had fallen into the gap, giving any B-cell or plasma-cell difference between the arms two candidate explanations. It had precedent: cutting ~800 integration features destroyed exactly those populations, because which genes are dropped matters more than how many. That concern is now closed. No lineage marker was dropped, and 1.1% of signal cannot account for a population-level difference.
+
+**What it does not settle.** The loss is not spread evenly across biology. Histones and tRNA synthetases are proliferation and translational-capacity signal, so if any cluster turns out to be defined by cell-cycle state, the scGPT arm saw a weakened version of that axis. That is a narrow caveat rather than the broad one it replaces, but it is the honest residue.
+
+Every figure above is produced by `scripts/05_audit_scgpt_gene_coverage.py`, which reads the matrix scGPT was actually given and writes its full report — the dropped-gene list, the name classes, the per-gene expression ranking, and the marker check — to `scgpt_gene_coverage_audit.json`. It refuses to run if the vendored vocabulary does not reproduce the run's recorded matched-gene count, so a mismatched vocabulary fails loudly rather than producing a plausible wrong answer.
 
 ## Future cluster labeling from gene expression
 

@@ -90,6 +90,16 @@ python scripts/02_prepare_figure1d.py
 python scripts/03_reproduce_figure1d.py
 ```
 
+Stages 04 and 05 are the scGPT comparison arm and are independent of the three above.
+Stage 04 needs the unpacked embedding bundle in `Age_trajectory/data/scgpt/` and Stage
+03's `seurat_input/` to check the two arms describe the same cells; Stage 05 reads
+finished artifacts only and can be run at any time.
+
+```bash
+python scripts/04_scgpt_figure1d.py
+python scripts/05_audit_scgpt_gene_coverage.py
+```
+
 All three must share a workspace (default `Age_trajectory/`). Every stage resumes
 from saved work, so re-running after an interruption is cheap.
 
@@ -99,13 +109,15 @@ SCTransform runs and costs hours.
 
 ## Layout
 
-- `scripts/` — the pipeline; the only code that runs. Stage 03's real work is in the
-  `.R` file, started automatically by the `.py` file.
+- `scripts/` — the pipeline; the only code that runs. Stages 03 and 04 do their real
+  work in a `.R` file, started automatically by the matching `.py` file.
 - `Age_trajectory/` — generated output, resumable, git-ignored. Not source.
-- `figure1d_author_workflow.R` — the authors' Figure 1D code, reference only.
-- `author_preprocessing/` — the authors' upstream steps, reference only. Confirms
-  nothing analytical is missing from this pipeline.
-- `archive/` — superseded notebooks and an unused scGPT snapshot. Never run.
+- `author_reference/` — the authors' own code, their Figure 1D workflow, the paper,
+  and its published figure. Reference only; confirms nothing analytical is missing
+  from this pipeline.
+- `archive/` — superseded notebooks and a vendored scGPT source snapshot. Never run,
+  but not inert: `archive/vendor/scGPT-main/scgpt/tokenizer/default_census_vocab.json`
+  is the gene vocabulary Stage 05 audits against.
 
 ## Before committing
 
