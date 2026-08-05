@@ -1,114 +1,119 @@
 # GSE200164 Figure 1D Reproduction
 
-This repository reproduces the clustering workflow used for Figure 1D of Piehl et al. using the public GSE200164 single-cell RNA-seq dataset.
+This repository reproduces the clustering workflow used for Figure 1D of Piehl et al. from the public GSE200164 single-cell RNA-seq dataset: **70,391 CSF immune cells from 59 individuals**.
 
-The dataset contains **70,391 CSF immune cells from 59 individuals**. The current reproduction generates an integrated UMAP with **11 unsupervised clusters**. The published figure is a later, annotated result in which the authors used marker genes and separate reclustering of T cells and monocytes to assign final cell-type labels.
+The current reproduction generates an integrated UMAP with **11 unsupervised clusters**. The published figure is a later, annotated result, in which the authors used marker genes and separate reclustering of T cells and monocytes to assign final cell-type labels.
 
 ![Current unsupervised UMAP](Age_trajectory/results/figure1d_python/figure1d_unsupervised_clusters.png)
 
 ## What the authors did
 
-### 1. Preprocess the sequencing data
+```mermaid
+flowchart TD
+    A["<b>1. Preprocess</b><br/>Cell Ranger 6.0.0 → GRCh38<br/>empty droplets removed<br/>SoupX ambient RNA correction<br/>DoubletFinder<br/>filter: ≥200 genes, &lt;10% mito"]
+    B["<b>2. Normalize per sample</b><br/>SCTransform on each of 59 samples<br/>1,000 variable genes<br/>regress nCount_RNA, nFeature_RNA, percent.mt<br/>ncells = 10,000"]
+    C["<b>3. Integrate</b><br/>shared features → anchors → one assay<br/>references: samples A4, A6"]
+    D["<b>4. PCA</b><br/>PCs 1–15 retained"]
+    E["<b>5. Cluster</b><br/>shared nearest-neighbor graph<br/>Louvain, resolution = 0.3<br/>→ 13 clusters"]
+    F["<b>6. UMAP</b><br/>PCs 1–15, n.neighbors = 30"]
+    G["<b>7. Identify populations</b><br/>FindAllMarkers + canonical markers<br/>→ T, mono, NK, DC, B, plasma"]
+    H["<b>8. Recluster T and mono</b><br/>PCA, neighbors, clustering, UMAP<br/>within each subset"]
+    I(["<b>Figure 1D</b><br/>refined labels written back<br/>onto the full-dataset UMAP"])
 
-The authors began with raw sequencing reads and:
+    A --> B --> C --> D
+    D --> E
+    D --> F
+    E --> G --> H --> I
+    F --> I
 
-1. aligned reads to GRCh38 with Cell Ranger 6.0.0;
-2. removed empty droplets;
-3. corrected ambient RNA contamination with SoupX;
-4. created one Seurat object per sample;
-5. removed doublets with DoubletFinder;
-6. removed cells with fewer than 200 detected genes or more than 10% mitochondrial reads.
-
-The public expression matrix used here is already the output of these preprocessing steps.
-
-### 2. Normalize each sample independently
-
-The authors split the merged Seurat object by sample and ran `SCTransform` separately on each sample.
-
-Important settings:
-
-- 1,000 variable genes per sample;
-- regression of `nCount_RNA`, `nFeature_RNA`, and `percent.mt`;
-- up to 10,000 cells used during model fitting.
-
-### 3. Integrate the 59 samples
-
-The authors selected shared integration features, prepared the SCT assays, found integration anchors, and combined the samples into one integrated assay.
-
-Samples A4 and A6 were used as references to reduce memory use during anchor finding.
-
-### 4. Generate the first cell representation with PCA
-
-PCA was run on the integrated assay. The first **15 principal components** were used for both clustering and UMAP.
-
-### 5. Build the cell-neighbor graph and cluster the cells
-
-The authors constructed a shared nearest-neighbor graph from PCs 1–15 and clustered it with the Louvain algorithm at:
-
-```text
-resolution = 0.3
+    style A fill:#e8e8e8,stroke:#666
+    style I fill:#d4e8d4,stroke:#4a7a4a
 ```
 
-Their software environment produced 13 first-pass numerical Seurat clusters.
+The public expression matrix used here is already the output of step 1.
 
-### 6. Generate the UMAP
+**PCA feeds clustering and UMAP separately.** UMAP visualizes the cells; the clusters come from the neighbor graph, not from the two-dimensional UMAP coordinates.
 
-UMAP was calculated from PCs 1–15 using:
-
-```text
-n.neighbors = 30
-```
-
-UMAP is used to visualize the cells. The clustering itself is determined from the neighbor graph, not from the two-dimensional UMAP coordinates.
-
-### 7. Identify broad immune-cell populations
-
-The authors calculated cluster marker genes with `FindAllMarkers` and inspected canonical markers including:
+Markers used in step 7:
 
 ```text
-CD3D, CD4, CD8A, CD8B, FOXP3
-NKG7, GNLY
-FCER1A
-CD68, CD14, FCGR3A
-CD19, JCHAIN
+CD3D, CD4, CD8A, CD8B, FOXP3    T cells and regulatory T cells
+NKG7, GNLY                      NK cells
+FCER1A                          dendritic cells
+CD68, CD14, FCGR3A              monocytes
+CD19, JCHAIN                    B cells and plasma cells
 ```
 
-The initial numerical clusters were grouped into broad T-cell, monocyte, NK-cell, dendritic-cell, B-cell, plasma-cell, and undetermined compartments.
-
-### 8. Recluster T cells and monocytes
-
-The authors then isolated the broad T-cell and monocyte compartments and repeated PCA, neighbor finding, clustering, and UMAP within each subset.
-
-This produced more specific labels, including:
-
-- CD4+ T cells;
-- CD8+ T cells;
-- CD4+/CD8+ T cells;
-- regulatory T cells;
-- classical, intermediate, and non-classical monocyte populations.
-
-These refined labels were written back onto the original full-dataset UMAP to create Figure 1D.
+Step 8 produced the finer labels: CD4+, CD8+, CD4+/CD8+, and regulatory T cells; classical, intermediate, and non-classical monocytes.
 
 ## What this repository currently does
 
-Our reproduction starts from the processed GEO expression matrix rather than the raw FASTQ files. Because that matrix is already the output of the authors' step 1, this pipeline picks up at their step 2 and carries through their step 6.
+Our reproduction starts from the processed GEO matrix rather than the raw FASTQ files, so it picks up at the authors' step 2 and carries through their step 6.
+
+```mermaid
+flowchart LR
+    subgraph authors ["Authors' workflow"]
+        direction TB
+        S1["1. Preprocess"]
+        S2["2. Normalize"]
+        S3["3. Integrate"]
+        S4["4. PCA"]
+        S5["5. Cluster"]
+        S6["6. UMAP"]
+        S7["7. Markers"]
+        S8["8. Recluster"]
+        S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7 --> S8
+    end
+
+    subgraph ours ["This repository"]
+        direction TB
+        P1["deposited GEO matrix<br/><i>already the output of step 1</i>"]
+        P2["Stages 01–03"]
+        P3["not yet reproduced<br/><i>the labeling work below</i>"]
+        P1 --> P2 --> P3
+    end
+
+    S1 -.-> P1
+    S2 -.-> P2
+    S6 -.-> P2
+    S7 -.-> P3
+
+    style S1 fill:#e8e8e8,stroke:#666
+    style S7 fill:#f5e6d3,stroke:#a08050
+    style S8 fill:#f5e6d3,stroke:#a08050
+    style P1 fill:#e8e8e8,stroke:#666
+    style P3 fill:#f5e6d3,stroke:#a08050
+```
 
 The work is split across three scripts, run in order. Each writes its result to disk and the next reads that file, so a stage can be re-run without repeating the ones before it.
 
-```text
-  Stage 01  ──▶  Stage 02  ──▶  Stage 03  ──▶  Figure 1D
-  acquire        prepare        analyze        11 clusters
-  (Python)       (Python)       (R, via Python)
+```mermaid
+flowchart LR
+    GEO[("GEO<br/>GSE200164")]
+    S1["<b>Stage 01</b> · Python<br/>acquire and audit"]
+    S2["<b>Stage 02</b> · Python<br/>measure quality"]
+    S3["<b>Stage 03</b> · R<br/>clustering workflow"]
+    FIG(["<b>Figure 1D</b><br/>11 clusters"])
+
+    C1[/"AnnData<br/>70,391 × genes"/]
+    C2[/"Matrix Market<br/>~4 GB, for R"/]
+    C3[/"per-stage checkpoints<br/>SCT · integration · PCA · clustering"/]
+
+    GEO --> S1 --> C1 --> S2 --> C2 --> S3 --> FIG
+    C3 -.resume.-> S3
+    S3 -.-> C3
+
+    style FIG fill:#d4e8d4,stroke:#4a7a4a
 ```
 
 ### Stage 01 — acquire the data and prove it is intact
 
 `scripts/01_download_audit_build_anndata.py`
 
-1. downloads the GEO expression matrix and the series metadata file, verifying each archive's gzip integrity and recording a SHA-256 digest so a later run can prove it started from identical source data;
-2. converts the very large dense CSV into a sparse matrix, storing only nonzero measurements, written in both row and column orientations;
+1. downloads the GEO expression matrix and series metadata, verifying each archive's gzip integrity and recording a SHA-256 digest, so a later run can prove it started from identical source data;
+2. converts the very large dense CSV into a sparse matrix, storing only nonzero measurements, in both row and column orientations;
 3. re-reads the original download and verifies the conversion changed no value — everything downstream depends on this holding;
-4. binds the measurements, gene names, and cell barcodes into a single AnnData object;
+4. binds measurements, gene names, and cell barcodes into a single AnnData object;
 5. parses the patient table from the series matrix and copies each person's age, sex, and diagnosis onto every one of their cells.
 
 The SoupX-adjusted values are fractional, not integer counts. They are preserved exactly at every step; rounding them would silently undo the authors' ambient-RNA correction.
@@ -118,95 +123,124 @@ The SoupX-adjusted values are fractional, not integer counts. They are preserved
 `scripts/02_prepare_figure1d.py`
 
 1. opens Stage 01's result and confirms its dimensions are unchanged;
-2. computes the three quality measures the authors regressed out — `nCount_RNA`, `nFeature_RNA`, and `percent.mt`;
-3. reconciles the two naming systems: GEO's accession-based sample names against the authors' `A1`–`H8` labels, and writes a 59-row summary of the study;
+2. computes the three quality measures the authors regressed out — `nCount_RNA`, `nFeature_RNA`, `percent.mt`;
+3. reconciles GEO's accession-based sample names against the authors' `A1`–`H8` labels, and writes a 59-row summary of the study;
 4. saves its own checkpoint so a re-run need not repeat the above;
 5. exports the matrix in Matrix Market form for R — skipped when Stage 03 already has a checkpoint to resume from, since the export is roughly 4 GB;
 6. confirms R and its packages are present now, rather than discovering they are not once Stage 03 is hours into the analysis.
 
-**No cells are removed.** The thresholds are recomputed and reported, but nothing is filtered: `percent.mt` maxes at 9.9979 and `nFeature_RNA` bottoms at 202, the fingerprints of the authors' filters having already run. Filtering again would diverge from the published dataset.
+**No cells are removed.** Thresholds are recomputed and reported, but nothing is filtered: `percent.mt` maxes at 9.9979 and `nFeature_RNA` bottoms at 202 — the fingerprints of the authors' filters having already run. Filtering again would diverge from the published dataset.
 
 ### Stage 03 — the clustering workflow
 
 `scripts/03_reproduce_figure1d.R`, started automatically by `scripts/03_reproduce_figure1d.py`
 
-This is the direct counterpart of the authors' steps 2 through 6:
+The direct counterpart of the authors' steps 2 through 6:
 
-1. rebuilds the Seurat object with `min.cells = 0, min.features = 0` — deliberately no thresholds, since the authors' already ran;
-2. splits the cells into 59 per-sample objects, asserting none are lost;
-3. runs `SCTransform` per sample with 1,000 variable genes, `ncells = 10000`, and regression of the three quality measures — matching the authors, with `vst.flavor = "v1"` set explicitly (see below);
-4. selects 2,000 shared integration features and prepares the SCT assays;
-5. finds integration anchors using samples **A4 and A6** as references, located by name rather than by position;
-6. integrates the samples into one assay, asserting the cell count is unchanged;
-7. runs PCA on the integrated assay, 50 components;
-8. builds the shared nearest-neighbor graph from PCs 1–15;
-9. clusters with Louvain at `resolution = 0.3`;
-10. runs UMAP from PCs 1–15 with `n.neighbors = 30`;
-11. writes the full Seurat object, a per-cell CSV of coordinates and cluster assignments, and the figure.
+```mermaid
+flowchart TD
+    R1["rebuild Seurat object<br/><code>min.cells = 0, min.features = 0</code><br/><i>no thresholds — the authors' already ran</i>"]
+    R2["split into 59 per-sample objects<br/><i>assert none lost</i>"]
+    R3["<b>SCTransform</b> per sample<br/>1,000 variable genes · ncells = 10,000<br/>regress the three quality measures<br/><code>vst.flavor = &quot;v1&quot;</code> set explicitly"]
+    R4["select 2,000 integration features<br/>prepare SCT assays"]
+    R5["<b>find anchors</b><br/>references A4 and A6, located by name"]
+    R6["<b>integrate</b> into one assay<br/><i>assert cell count unchanged</i>"]
+    R7["<b>PCA</b> · 50 components"]
+    R8["shared nearest-neighbor graph<br/>PCs 1–15"]
+    R9["<b>Louvain</b> · resolution = 0.3"]
+    R10["<b>UMAP</b> · PCs 1–15, n.neighbors = 30"]
+    R11(["write Seurat object,<br/>per-cell CSV, figure"])
 
-Because steps 3 through 6 take hours, each is checkpointed. `--restart-from {none,clustering,pca,integration,all}` controls how far back a re-run goes: re-tuning the clustering costs minutes, while `all` redoes 59 `SCTransform` runs and costs hours.
+    R1 --> R2 --> R3 --> R4 --> R5 --> R6 --> R7 --> R8 --> R9 --> R10 --> R11
+
+    style R11 fill:#d4e8d4,stroke:#4a7a4a
+```
+
+The expensive steps are checkpointed, so `--restart-from` controls how far back a re-run goes:
+
+| `--restart-from` | redoes | keeps | cost |
+| --- | --- | --- | --- |
+| `none` *(default)* | nothing | the most advanced checkpoint | — |
+| `clustering` | neighbors, Louvain, UMAP | the PCA checkpoint | minutes |
+| `pca` | PCA onward | the integrated object | ~30 min |
+| `integration` | anchors, `IntegrateData` | the 59 SCT checkpoints | hours |
+| `all` | everything, including per-sample SCTransform | nothing | many hours |
+
+Each level discards its own checkpoint and every later one, so asking for a cheap re-run never triggers an expensive step.
 
 ### Result and the unexplained cluster-count difference
 
 The result contains all 70,391 cells but currently produces **11 numerical clusters** where the authors reported 13.
 
-**Why this happens is currently unknown.** What can be stated is only the following:
+**Why this happens is currently unknown.** What can be stated is only:
 
 - every published parameter is reproduced as written — 1,000 variable genes, the same three regressed covariates, 2,000 integration features, references A4 and A6, PCs 1–15, resolution 0.3, `n.neighbors = 30`;
 - the pipeline starts from the same deposited matrix the authors' own Figure 1D script starts from;
 - all 70,391 cells are present, so the difference is not caused by dropped or filtered cells.
 
-A plausible explanation is that the Seurat implementations of `SCTransform` and Louvain clustering have changed since October 2021, moving where cluster boundaries fall. **That is a hypothesis, not a finding — it has not been tested here.** Doing so would mean re-running the pipeline pinned to the authors' original package versions and comparing, which has not been attempted. Other explanations have not been excluded: an undocumented parameter, a difference in the object the authors actually started from, or an unrecorded step between their preprocessing and their Figure 1D script.
+A plausible explanation is that the Seurat implementations of `SCTransform` and Louvain clustering have changed since October 2021, moving where cluster boundaries fall. **That is a hypothesis, not a finding — it has not been tested here.** Testing it would mean re-running pinned to the authors' original package versions and comparing, which has not been attempted. Other explanations are not excluded: an undocumented parameter, a difference in the object the authors actually started from, or an unrecorded step between their preprocessing and their Figure 1D script.
 
 Two decisions follow from not knowing:
 
 - **`vst.flavor = "v1"` is set deliberately.** The authors wrote their script before SCTransform v2 existed, so their unspecified call ran v1; modern Seurat defaults to v2. Removing this line would look like a closer match to their code while running a different algorithm. This narrows one known source of divergence — it does not resolve the count.
-- **The resolution is not tuned to force 13 clusters.** Raising it until the number matched would report the published count obtained by a different method, and would bury the discrepancy rather than record it.
+- **The resolution is not tuned to force 13 clusters.** Raising it until the number matched would report the published count obtained by a different method, burying the discrepancy rather than recording it.
 
 **We are proceeding on this basis.** 11 clusters is the honest current output, the downstream comparison work does not depend on the count matching, and the difference is documented here rather than tuned away. If the cause is identified later, this section should be updated to say so.
 
-The authors' steps 7 and 8 — marker-gene identification and reclustering of T cells and monocytes — are not yet reproduced. Those are the subject of the labeling work described below.
-
-
 ## Future scGPT comparison
 
-The next comparison will replace the PCA-based cell representation with a frozen scGPT embedding while keeping the downstream workflow as similar as possible.
+The next comparison replaces the PCA-based cell representation with a frozen scGPT embedding, keeping everything downstream as similar as possible.
 
-Planned steps:
+```mermaid
+flowchart TD
+    A[("same AnnData object<br/>same cells, same metadata")]
 
-1. load the same AnnData object and retain the same cells and metadata;
-2. generate one scGPT embedding vector for each cell;
-3. store the vectors in `adata.obsm["X_scgpt"]`;
-4. build a nearest-neighbor graph directly from the scGPT vectors;
-5. cluster the graph using the same resolution target;
-6. generate a UMAP using the same neighbor setting;
-7. compare the PCA and scGPT results on the same cells.
+    B["SCTransform integration"]
+    C["<b>PCA</b><br/>PCs 1–15"]
 
-The comparison will evaluate:
+    D["frozen <b>scGPT</b> embedding<br/>one vector per cell<br/><code>adata.obsm[&quot;X_scgpt&quot;]</code>"]
 
-- cluster stability;
-- separation of broad immune populations;
-- mixing of cells from different donors;
-- agreement with marker-gene expression;
-- recovery of rare or transitional populations.
+    E["nearest-neighbor graph"]
+    F["nearest-neighbor graph"]
+    G["clustering · same resolution target"]
+    H["clustering · same resolution target"]
+    I["UMAP · same n.neighbors"]
+    J["UMAP · same n.neighbors"]
 
-SCTransform integration and PCA define the original representation. In the scGPT branch, those coordinates are replaced by the scGPT vectors; the graph clustering, UMAP, and biological interpretation steps remain parallel.
+    K(["<b>compare on the same cells</b><br/>cluster stability · separation of broad populations<br/>donor mixing · marker-gene agreement<br/>recovery of rare and transitional populations"])
+
+    A --> B --> C --> E --> G --> I --> K
+    A --> D --> F --> H --> J --> K
+
+    style C fill:#dbe8f5,stroke:#4a6a8a
+    style D fill:#f0dbe8,stroke:#8a4a6a
+    style K fill:#d4e8d4,stroke:#4a7a4a
+```
+
+Only the representation differs. The graph clustering, UMAP, and biological interpretation steps stay parallel.
 
 ## Future cluster labeling from gene expression
 
-Cluster labels should be assigned from the original normalized RNA expression values, not from UMAP coordinates or the embedding dimensions alone.
+Cluster labels should be assigned from the original normalized RNA expression values — not from UMAP coordinates or embedding dimensions alone. The same workflow applies to both the PCA and scGPT clusters, so the two can be compared on the same biological evidence.
 
-For both the PCA and scGPT clusters, the planned annotation workflow is:
+```mermaid
+flowchart TD
+    A["differential expression<br/>each cluster vs. all remaining cells"]
+    B["rank positively enriched genes per cluster"]
+    C["inspect marker heatmaps and expression plots"]
+    D["assign broad labels<br/>from combinations of canonical markers"]
+    E{"marker expression<br/>consistent across<br/>multiple donors?"}
+    F["isolate broad T-cell and monocyte populations<br/>recluster for finer labels"]
+    G(["labeled clusters"])
+    H["keep labeled <b>ambiguous</b><br/><i>rather than forcing a cell type</i>"]
 
-1. run differential-expression analysis for every cluster against all remaining cells;
-2. rank the positively enriched genes for each cluster;
-3. inspect marker heatmaps and expression plots;
-4. assign broad labels from combinations of canonical markers;
-5. validate that marker expression is consistent across multiple donors;
-6. isolate broad T-cell and monocyte populations and recluster them for finer labels;
-7. keep uncertain populations labeled as ambiguous rather than forcing a cell type.
+    A --> B --> C --> D --> E
+    E -->|yes| F --> G
+    E -->|no| H --> G
 
-This will allow the PCA and scGPT clusterings to be compared using the same biological evidence.
+    style G fill:#d4e8d4,stroke:#4a7a4a
+    style H fill:#f5e6d3,stroke:#a08050
+```
 
 ## References
 
