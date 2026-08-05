@@ -249,15 +249,39 @@ for (sample_name in expected_samples) {
 
 # Step 2: merge the 59 samples into one dataset.
 #
-# Choose the 2,000 genes that are most informative across the samples generally,
-# rather than within any one of them. These become the shared vocabulary the merge
-# works in — comparing samples on genes that are uninformative in most of them
-# would align on noise.
+# The merge needs a shared vocabulary: genes that are informative across the samples
+# generally, rather than within any one of them. Comparing samples on genes that are
+# uninformative in most of them would align on noise.
+#
+# The pool of candidates is smaller than it appears. It begins as the union of all 59
+# samples' 1,000 variable genes, then is cut to genes measured in every sample — and
+# the smallest sample here holds 151 cells, so it contributes few. That intersection,
+# not the number requested, is the real limit: asking for 3,000 returns about 2,816,
+# which is the entire pool.
+#
+# Asking for the whole pool is the point. Candidates are ranked by how many samples
+# each gene varies in, so any cut keeps genes that vary everywhere and discards genes
+# that vary in only a few. Markers of rare cell types are necessarily the latter — a
+# plasma-cell gene can only look variable in the samples that contained plasma cells.
+# Requesting 2,000 therefore discards roughly 800 candidates and takes the rare-
+# population markers with them, leaving those cells with nothing to separate on. The
+# authors requested 2,000, by leaving the argument unwritten, but their 2021 software
+# left them a larger pool to take 2,000 from than this version leaves.
 message("Selecting integration features and preparing SCT residuals...")
 integration_features <- SelectIntegrationFeatures(
   object.list = sct_list,
-  nfeatures = 2000
+  nfeatures = 3000
 )
+message("Integration features available: ", length(integration_features))
+# Receiving the full number asked for means the pool was larger than the request, so
+# genes were dropped by the ranking rather than by availability — the situation this
+# setting exists to avoid, and a sign the request should be raised again.
+if (length(integration_features) >= 3000) {
+  warning(
+    "Integration features were limited by the request rather than by the data; ",
+    "markers of rare cell types may have been ranked out"
+  )
+}
 sct_list <- PrepSCTIntegration(
   object.list = sct_list,
   anchor.features = integration_features,
@@ -275,6 +299,15 @@ if (anyNA(reference_indices)) {
 # Find anchors: pairs of cells in different samples that look enough alike to be
 # taken as the same kind of cell. These pairings are what reveal how each sample is
 # systematically offset from the reference, and therefore how to correct it.
+#
+# This step and the merge below both draw on random numbers but accept no setting to
+# fix them, so they continue from wherever the preceding work happened to leave the
+# sequence. That is a problem here specifically because this script resumes: a run
+# that recomputed 59 normalizations arrives with a different position in the sequence
+# than a run that read them from disk, so the same data could yield different anchors
+# depending on how much was recomputed. Restarting the sequence immediately before
+# each step makes the result a function of the data alone.
+set.seed(random_seed)
 message("Finding SCT integration anchors...")
 integration_anchors <- FindIntegrationAnchors(
   object.list = sct_list,
@@ -289,6 +322,7 @@ integration_anchors <- FindIntegrationAnchors(
 # group together should do so because they are the same type of cell, not because
 # they came from the same patient. The cell count must be unchanged: merging adjusts
 # the measurements, it never adds or discards cells.
+set.seed(random_seed)
 message("Integrating samples...")
 integrated <- IntegrateData(
   anchorset = integration_anchors,
@@ -333,15 +367,23 @@ if (file.exists(pca_checkpoint) && !redo_from("pca")) {
   }
   # Each cell is currently described by thousands of gene measurements, most of
   # which move together — genes involved in the same cell function rise and fall as
-  # a group. This condenses that down to 50 combined dimensions, ordered so the
+  # a group. This condenses that down to 30 combined dimensions, ordered so the
   # first captures the largest pattern of variation among cells, the second the next
-  # largest, and so on. Later steps use only the strongest of these, on the reasoning
-  # that the leading patterns carry the biology while the trailing ones carry noise.
+  # largest, and so on. Later steps use only the strongest 15 of these, on the
+  # reasoning that the leading patterns carry the biology while the trailing ones
+  # carry noise.
+  #
+  # How many are calculated is not simply an upper bound on how many are used. The
+  # decomposition is solved by successive approximation rather than exactly, so
+  # asking for more dimensions slightly changes the ones that are kept. The effect on
+  # the leading 15 is small, but it is not nothing, and 30 is the number behind the
+  # closer reference run. The authors left this unwritten, which meant 50 for them.
   DefaultAssay(integrated) <- "integrated"
+  set.seed(random_seed)
   integrated <- RunPCA(
     integrated,
     assay = "integrated",
-    npcs = 50,
+    npcs = 30,
     verbose = TRUE
   )
   saveRDS(integrated, pca_checkpoint, compress = FALSE)
@@ -364,12 +406,22 @@ if (file.exists(pca_checkpoint) && !redo_from("pca")) {
 # structure, not a measurement — distances across it should not be read as
 # quantities, and the clustering above does not depend on it.
 #
-# One caveat on interpreting the output: this run produces 11 clusters where the
-# paper reported 13. Both the grouping and the layout depend on implementation
-# details that have changed across Seurat versions, so the published settings do not
-# guarantee a matching cluster count on modern software.
+# One caveat on interpreting the output: the paper reported 13 clusters and this is
+# unlikely to recover exactly that. Cluster count is a sensitive readout, and both the
+# grouping and the layout depend on implementation details that have changed across
+# Seurat versions, so the published settings do not guarantee a published answer on
+# modern software.
+#
+# What the count does diagnose is whether rare populations survived. An earlier
+# version of this script cut the integration features above to 2,000 and returned 11
+# clusters, none smaller than 671 cells — the paper's B-cell and undetermined
+# populations were absorbed rather than resolved. Taking the full pool of features
+# recovered 12 clusters, the smallest holding 120 cells. A result with no small
+# clusters means the rare cell types were lost upstream, and the place to look is the
+# feature selection, not this resolution setting.
 message("Running neighbors, Louvain clustering, and UMAP...")
 DefaultAssay(integrated) <- "integrated"
+set.seed(random_seed)
 integrated <- FindNeighbors(integrated, reduction = "pca", dims = 1:15, verbose = TRUE)
 integrated <- FindClusters(
   integrated,
@@ -436,23 +488,35 @@ close(cluster_connection)
 # The figure: every cell drawn at its position on the map, coloured by cluster.
 # This is the reproduction of Figure 1D, minus the cell-type names the authors
 # assigned afterwards — the clusters here are numbered, not identified.
+#
+# The cells are painted onto a fixed grid of pixels rather than drawn as 70,391
+# separate shapes, which keeps this fast. The grid has to be at least as fine as the
+# image it is saved into, or each cell is stretched over several pixels and the map
+# washes out to a pale smear. Its default is 512 by 512, far coarser than the image
+# below, so the two are tied to the same numbers here rather than set independently.
+figure_width_inches <- 9
+figure_height_inches <- 7
+figure_dpi <- 300
 plot <- DimPlot(
   integrated,
   reduction = "umap",
   group.by = "seurat_clusters",
   label = TRUE,
   repel = TRUE,
-  # Drawn as an image rather than 70,391 individual shapes, which keeps the file
-  # small enough to open comfortably.
   raster = TRUE,
-  pt.size = 0.15
+  raster.dpi = c(
+    figure_width_inches * figure_dpi,
+    figure_height_inches * figure_dpi
+  ),
+  # The size the authors drew each cell at in the published figure.
+  pt.size = 1
 )
 ggsave(
   filename = file.path(output_dir, "figure1d_unsupervised_clusters.png"),
   plot = plot,
-  width = 9,
-  height = 7,
-  dpi = 300
+  width = figure_width_inches,
+  height = figure_height_inches,
+  dpi = figure_dpi
 )
 
 message("Figure 1D workflow complete: ", final_path)

@@ -37,17 +37,35 @@ in October 2021, before v2 existed, so their unspecified call ran v1. Modern Seu
 defaults to v2. Removing this line would look like a closer match to their script but
 would actually break the reproduction.
 
-**11 clusters is the expected result, not a bug.** The paper reports 13. Every
-published parameter is reproduced exactly (verified against
-`figure1d_author_workflow.R` and `author_preprocessing/`), and the pipeline starts
-from the same object their Figure 1D script starts from. The difference is four years
-of Seurat implementation drift, mostly in SCTransform. Do not "fix" it by tuning
-resolution.
+**Cluster count is a diagnostic, not a target.** The paper reports 13, and matching
+that exactly is not expected — clustering and layout both shifted across Seurat
+versions. What the count does reveal is whether rare populations survived. An earlier
+Stage 03 returned 11 clusters with nothing smaller than 671 cells; that was not
+version drift but the integration feature request cutting the candidate pool to
+2,000, which discards markers of rare cell types (see below). Taking the whole pool
+recovers a 120-cell cluster. A run with no small clusters means the rare cell types
+were lost during feature selection. Do not chase the count by tuning `resolution`.
 
-**Stage 03 parameters that look like magic numbers are Seurat defaults** — 2,000
-integration features, `dims = 1:30`, 50 PCs, `algorithm = 1`. The authors left them
-unspecified; they are written out here for readability. The genuinely chosen values
-are 1,000 variable features, resolution 0.3, and `dims = 1:15`.
+**Two Stage 03 numbers deliberately depart from the authors' code.** They requested
+2,000 integration features and 50 PCs, both by leaving the arguments unwritten; Stage
+03 requests 3,000 and 30. The 3,000 is load-bearing. `SelectIntegrationFeatures`
+keeps only genes present in every sample, and the smallest sample has 151 cells, so
+the candidate pool here is about 2,816 — meaning 3,000 requests all of them while
+2,000 discards ~800. Candidates rank by how many samples a gene varies in, so the
+discarded 800 are precisely the rare-cell-type markers, which can only look variable
+in the few samples containing those cells. The authors' 2021 software left them a
+larger pool to take 2,000 from.
+
+**Stage 03 numbers that do match Seurat defaults** are defaults written out for
+readability — `dims = 1:30`, `algorithm = 1`, and `ncells = 10000` (inert either way;
+the largest sample is 4,645 cells). The authors' genuine choices are 1,000 variable
+features, resolution 0.3, and `dims = 1:15`, all unchanged.
+
+**Stage 03 reseeds before every stochastic step.** `FindIntegrationAnchors` and
+`IntegrateData` use randomness but take no seed argument, so they inherit whatever
+state preceded them. Because the script resumes from checkpoints, that state depends
+on how much of the run was recomputed. The `set.seed` calls before those steps are
+what make a resumed run and a fresh run agree; they are not redundant.
 
 **The three stages repeat their path and validation helpers on purpose.** They import
 nothing from each other, so each file can be read and run on its own. This trades some

@@ -2,7 +2,9 @@
 
 This repository reproduces the clustering workflow used for Figure 1D of Piehl et al. from the public GSE200164 single-cell RNA-seq dataset: **70,391 CSF immune cells from 59 individuals**.
 
-The current reproduction generates an integrated UMAP with **11 unsupervised clusters**. The published figure is a later, annotated result, in which the authors used marker genes and separate reclustering of T cells and monocytes to assign final cell-type labels.
+The reproduction generates an integrated UMAP of unsupervised clusters. The published figure is a later, annotated result, in which the authors used marker genes and separate reclustering of T cells and monocytes to assign final cell-type labels.
+
+The image below is from the earlier 11-cluster run, before the integration-feature correction described in [Result and the cluster-count difference](#result-and-the-cluster-count-difference); it will be replaced when the corrected pipeline is re-run.
 
 ![Current unsupervised UMAP](Age_trajectory/results/figure1d_python/figure1d_unsupervised_clusters.png)
 
@@ -93,7 +95,7 @@ flowchart LR
     S1["<b>Stage 01</b> · Python<br/>acquire and audit"]
     S2["<b>Stage 02</b> · Python<br/>measure quality"]
     S3["<b>Stage 03</b> · R<br/>clustering workflow"]
-    FIG(["<b>Figure 1D</b><br/>11 clusters"])
+    FIG(["<b>Figure 1D</b><br/>clustered UMAP"])
 
     C1[/"AnnData<br/>70,391 × genes"/]
     C2[/"Matrix Market<br/>~4 GB, for R"/]
@@ -142,10 +144,10 @@ flowchart TD
     R1["rebuild Seurat object<br/><code>min.cells = 0, min.features = 0</code><br/><i>no thresholds — the authors' already ran</i>"]
     R2["split into 59 per-sample objects<br/><i>assert none lost</i>"]
     R3["<b>SCTransform</b> per sample<br/>1,000 variable genes · ncells = 10,000<br/>regress the three quality measures<br/><code>vst.flavor = &quot;v1&quot;</code> set explicitly"]
-    R4["select 2,000 integration features<br/>prepare SCT assays"]
+    R4["select integration features<br/>request 3,000 → the full pool of ~2,816<br/>prepare SCT assays"]
     R5["<b>find anchors</b><br/>references A4 and A6, located by name"]
     R6["<b>integrate</b> into one assay<br/><i>assert cell count unchanged</i>"]
-    R7["<b>PCA</b> · 50 components"]
+    R7["<b>PCA</b> · 30 components"]
     R8["shared nearest-neighbor graph<br/>PCs 1–15"]
     R9["<b>Louvain</b> · resolution = 0.3"]
     R10["<b>UMAP</b> · PCs 1–15, n.neighbors = 30"]
@@ -168,24 +170,32 @@ The expensive steps are checkpointed, so `--restart-from` controls how far back 
 
 Each level discards its own checkpoint and every later one, so asking for a cheap re-run never triggers an expensive step.
 
-### Result and the unexplained cluster-count difference
+### Result and the cluster-count difference
 
-The result contains all 70,391 cells but currently produces **11 numerical clusters** where the authors reported 13.
+The result contains all 70,391 cells. The authors reported 13 clusters.
 
-**Why this happens is currently unknown.** What can be stated is only:
+**An earlier version of this pipeline produced 11, and most of that gap now has an identified cause.** It requested 2,000 integration features, matching the authors' code as written. But `SelectIntegrationFeatures` keeps only genes measured in every one of the 59 samples, and the smallest sample holds 151 cells, so on Seurat 5.5.1 the candidate pool is roughly 2,816 genes rather than the tens of thousands the request implies. Asking for 2,000 discarded about 800 of them.
 
-- every published parameter is reproduced as written — 1,000 variable genes, the same three regressed covariates, 2,000 integration features, references A4 and A6, PCs 1–15, resolution 0.3, `n.neighbors = 30`;
-- the pipeline starts from the same deposited matrix the authors' own Figure 1D script starts from;
-- all 70,391 cells are present, so the difference is not caused by dropped or filtered cells.
+Which 800 is what matters. Candidates rank by how many samples each gene varies in, so the cut keeps genes that vary everywhere and drops genes that vary in only a few — and a plasma-cell or B-cell marker can only look variable in the samples that contained those cells. The markers of rare populations were removed before the merge, leaving those cells nothing to separate on:
 
-A plausible explanation is that the Seurat implementations of `SCTransform` and Louvain clustering have changed since October 2021, moving where cluster boundaries fall. **That is a hypothesis, not a finding — it has not been tested here.** Testing it would mean re-running pinned to the authors' original package versions and comparing, which has not been attempted. Other explanations are not excluded: an undocumented parameter, a difference in the object the authors actually started from, or an unrecorded step between their preprocessing and their Figure 1D script.
+| | clusters | smallest cluster |
+| --- | --- | --- |
+| authors | 13 | B cells, Undetermined |
+| pipeline requesting 2,000 features | 11 | 671 cells |
+| notebook run on the full pool | 12 | 120 cells |
 
-Two decisions follow from not knowing:
+Stage 03 now requests 3,000, which returns the pool entire. **The corrected pipeline has not yet been re-run end to end** — the 12-cluster row above comes from a notebook run over the identical matrix (`edited_good_reproduction.md`), not from this pipeline.
+
+Two further differences were corrected at the same time. PCA computed 50 components where that reference run computed 30; the decomposition is iterative rather than exact, so the count perturbs the 15 components actually used. And `DimPlot` painted all 70,391 cells onto a 512 × 512 grid before stretching it across a 2,700 × 2,100 image, washing the figure out for reasons that have nothing to do with the analysis.
+
+**Matching 13 exactly is still not expected.** The remaining gap is still attributed to Seurat implementation drift since October 2021 — a hypothesis that has not been tested, since testing it means re-running pinned to the authors' original package versions. Other explanations remain open: an undocumented parameter, or an unrecorded step between their preprocessing and their Figure 1D script.
+
+Two decisions stand:
 
 - **`vst.flavor = "v1"` is set deliberately.** The authors wrote their script before SCTransform v2 existed, so their unspecified call ran v1; modern Seurat defaults to v2. Removing this line would look like a closer match to their code while running a different algorithm. This narrows one known source of divergence — it does not resolve the count.
 - **The resolution is not tuned to force 13 clusters.** Raising it until the number matched would report the published count obtained by a different method, burying the discrepancy rather than recording it.
 
-**We are proceeding on this basis.** 11 clusters is the honest current output, the downstream comparison work does not depend on the count matching, and the difference is documented here rather than tuned away. If the cause is identified later, this section should be updated to say so.
+Cluster count is treated as a diagnostic rather than a target. A run that returns no small clusters is evidence that rare cell types were lost during feature selection, and that is where to look.
 
 ## Future scGPT comparison
 
