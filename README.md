@@ -4,9 +4,11 @@ This repository reproduces the clustering workflow used for Figure 1D of Piehl e
 
 The reproduction generates an integrated UMAP of unsupervised clusters. The published figure is a later, annotated result, in which the authors used marker genes and separate reclustering of T cells and monocytes to assign final cell-type labels.
 
-The image below is from the earlier 11-cluster run, before the integration-feature correction described in [Result and the cluster-count difference](#result-and-the-cluster-count-difference); it will be replaced when the corrected pipeline is re-run.
+The image below is the corrected pipeline's own result: 12 unsupervised clusters over all 70,391 cells, after the integration-feature correction described in [Result and the cluster-count difference](#result-and-the-cluster-count-difference).
 
-![Current unsupervised UMAP](Age_trajectory/results/figure1d_python/figure1d_unsupervised_clusters.png)
+![Unsupervised UMAP from the Seurat arm: 70,391 CSF immune cells in 12 clusters](Age_trajectory/results/figure1d_python/figure1d_unsupervised_clusters.png)
+
+**Stage 03, the Seurat arm.** SCTransform per sample, integration over the full 2,816-gene candidate pool, PCs 1–15, Louvain at resolution 0.3. Clusters are numbered, not identified — the authors' cell-type names come from the marker and reclustering steps this reproduction stops short of. Cluster sizes run from 18,533 cells down to 787, the two smallest being the 976-cell cluster 10 and the 787-cell cluster 11; the earlier 2,000-feature run bottomed out at 671 with nothing below it.
 
 ## What the authors did
 
@@ -172,43 +174,31 @@ Each level discards its own checkpoint and every later one, so asking for a chea
 
 ### Result and the cluster-count difference
 
-The result contains all 70,391 cells. The authors reported 13 clusters.
+The result contains all 70,391 cells in 12 clusters. The authors reported 13.
 
-**An earlier version of this pipeline produced 11, and most of that gap now has an identified cause.** It requested 2,000 integration features, matching the authors' code as written. But `SelectIntegrationFeatures` keeps only genes measured in every one of the 59 samples, and the smallest sample holds 151 cells, so on Seurat 5.5.1 the candidate pool is roughly 2,816 genes rather than the tens of thousands the request implies. Asking for 2,000 discarded about 800 of them.
-
-Which 800 is what matters. Candidates rank by how many samples each gene varies in, so the cut keeps genes that vary everywhere and drops genes that vary in only a few — and a plasma-cell or B-cell marker can only look variable in the samples that contained those cells. The markers of rare populations were removed before the merge, leaving those cells nothing to separate on:
-
-| | clusters | smallest cluster |
-| --- | --- | --- |
-| authors | 13 | B cells, Undetermined |
-| pipeline requesting 2,000 features | 11 | 671 cells |
-| notebook run on the full pool | 12 | 120 cells |
-
-Stage 03 now requests 3,000, which returns the pool entire. **The corrected pipeline has since been re-run end to end and returned 12 clusters**, matching the notebook run over the identical matrix (`edited_good_reproduction.md`) that first produced that number.
-
-Two further differences were corrected at the same time. PCA computed 50 components where that reference run computed 30; the decomposition is iterative rather than exact, so the count perturbs the 15 components actually used. And `DimPlot` painted all 70,391 cells onto a 512 × 512 grid before stretching it across a 2,700 × 2,100 image, washing the figure out for reasons that have nothing to do with the analysis.
-
-**Matching 13 exactly is still not expected.** The remaining gap is still attributed to Seurat implementation drift since October 2021 — a hypothesis that has not been tested, since testing it means re-running pinned to the authors' original package versions. Other explanations remain open: an undocumented parameter, or an unrecorded step between their preprocessing and their Figure 1D script.
-
-Two decisions stand:
-
-- **`vst.flavor = "v1"` is set deliberately.** The authors wrote their script before SCTransform v2 existed, so their unspecified call ran v1; modern Seurat defaults to v2. Removing this line would look like a closer match to their code while running a different algorithm. This narrows one known source of divergence — it does not resolve the count.
-- **The resolution is not tuned to force 13 clusters.** Raising it until the number matched would report the published count obtained by a different method, burying the discrepancy rather than recording it.
-
-Cluster count is treated as a diagnostic rather than a target. A run that returns no small clusters is evidence that rare cell types were lost during feature selection, and that is where to look.
+The resolution is not tuned to force 13, and `vst.flavor = "v1"` stays set. Cluster count is a diagnostic, not a target: a run with no small clusters means rare cell types were lost during feature selection, and that is where to look.
 
 ## Stage 04 — the scGPT comparison
 
 This arm replaces the PCA-based cell representation with a frozen scGPT embedding and keeps everything downstream identical. It has been run: `scripts/04_scgpt_figure1d.py` starts `04_scgpt_figure1d.R`, and the results are in `Age_trajectory/results/figure1d_scgpt/`.
 
+The diagram below shows **both arms side by side**, not Stage 04 alone. Stage 04 is only the right-hand branch; the left-hand branch is Stage 03, a separate script. Neither arm is batch-corrected against the other's method here — that asymmetry is what Stage 06 later exists to remove.
+
 ```mermaid
 flowchart TD
     A[("same 70,391 cells<br/>same metadata, same cell order")]
 
-    B["SCTransform integration<br/>59 samples, 3,000 features"]
-    C["<b>PCA</b> · PCs 1–15"]
+    subgraph S3["Stage 03 · scripts/03_reproduce_figure1d.R"]
+        B["<b>SCTransform</b> per sample · 59 runs<br/>1,000 variable genes<br/>regress nCount, nFeature, percent.mt"]
+        B2["<b>find anchors + IntegrateData</b><br/>references A4, A6 · ~2,816 features<br/><i>← this is the batch correction</i>"]
+        C["<b>PCA</b> · 30 computed, PCs 1–15 used"]
+    end
 
-    D["frozen <b>scGPT</b> whole-human<br/>512 dimensions per cell<br/>15,960 of 19,689 genes in vocabulary"]
+    subgraph S4["Stage 04 · scripts/04_scgpt_figure1d.R"]
+        D0["<b>vocabulary match</b> · 15,960 of 19,689 genes"]
+        D1["<b>per-cell quantile binning</b> · 51 bins<br/><i>scGPT's own normalization</i>"]
+        D["frozen <b>scGPT</b> whole-human<br/>512 dimensions per cell<br/><b><i>no batch correction of any kind</i></b>"]
+    end
 
     E["nearest-neighbor graph"]
     F["nearest-neighbor graph"]
@@ -222,9 +212,10 @@ flowchart TD
 
     K(["<b>compare on the same cells</b><br/>cluster stability · separation of broad populations<br/>donor mixing · marker-gene agreement<br/>recovery of rare and transitional populations"])
 
-    A --> B --> C --> E --> G --> I --> L --> K
-    A --> D --> F --> H --> J --> M --> K
+    A --> B --> B2 --> C --> E --> G --> I --> L --> K
+    A --> D0 --> D1 --> D --> F --> H --> J --> M --> K
 
+    style B2 fill:#f5e6d3,stroke:#a08050
     style C fill:#dbe8f5,stroke:#4a6a8a
     style D fill:#f0dbe8,stroke:#8a4a6a
     style K fill:#d4e8d4,stroke:#4a7a4a
@@ -235,6 +226,10 @@ Only the representation differs. Both arms run the same Seurat 5.5.1 code at the
 **One departure is unavoidable.** Stage 03 takes principal components 1–15, which is meaningful because PCA orders its output by variance captured — the tail is discardable noise. An scGPT embedding has no such ordering: its 512 dimensions are learned jointly and none is privileged, so there is no leading 15 to take. All 512 are used, as these embeddings are normally consumed. The vectors are unit length, so no dimension dominates the distance through scale alone.
 
 **The two arms skip very different amounts of work.** Stage 04 runs only the bottom row of the diagram — no SCTransform, no anchor finding, no integration, no PCA. It finished in about 7 minutes against Stage 03's roughly 90, but the comparison is not like for like: the embedding itself cost 618 seconds on an L4 GPU in a separate session. The deeper difference is that scGPT never performs explicit batch correction. It is trusted to place a CD8 T cell in a similar region regardless of which of the 59 samples it came from, because it was pretrained across tens of millions of cells. That assumption is one of the things this comparison exists to test — if the scGPT clusters segregate by `internal_sample_id`, the speed came at the cost of uncorrected batch effects.
+
+![UMAP from the scGPT arm: the same 70,391 cells in 13 clusters, from a frozen embedding](Age_trajectory/results/figure1d_scgpt/figure1d_scgpt_clusters.png)
+
+**Stage 04, the scGPT arm — the same 70,391 cells, grouped from a frozen embedding instead of from PCA.** Read against the Seurat figure above, which is drawn at the same size, palette, and settings so the two can be compared directly. This arm returns 13 clusters to Stage 03's 12, and splits them further at the small end: five clusters under 1,000 cells against Stage 03's two, down to 103 cells in cluster 12. Whether that finer division reflects real populations the PCA arm merged, or uncorrected batch structure of the kind Stage 03 removes explicitly, is not settled by the layout alone — cluster labels have not been assigned from marker genes in either arm, and the donor-mixing check that would distinguish the two readings is the comparison this figure sets up rather than one it answers.
 
 ### The genes scGPT never saw
 
@@ -260,6 +255,228 @@ The 198 conventional symbols are nomenclature drift, not missing biology. The da
 **What it does not settle.** The loss is not spread evenly across biology. Histones and tRNA synthetases are proliferation and translational-capacity signal, so if any cluster turns out to be defined by cell-cycle state, the scGPT arm saw a weakened version of that axis. That is a narrow caveat rather than the broad one it replaces, but it is the honest residue.
 
 Every figure above is produced by `scripts/05_audit_scgpt_gene_coverage.py`, which reads the matrix scGPT was actually given and writes its full report — the dropped-gene list, the name classes, the per-gene expression ranking, and the marker check — to `scgpt_gene_coverage_audit.json`. It refuses to run if the vendored vocabulary does not reproduce the run's recorded matched-gene count, so a mismatched vocabulary fails loudly rather than producing a plausible wrong answer.
+
+## Stage 06 — making the two arms comparable
+
+Stages 03 and 04 cannot be compared directly. Stage 03 corrects for patient with integration anchors *before* reducing dimensions; Stage 04 does not correct at all, because scGPT expects count-scale input. One arm is batch-corrected and the other is not, so a clustering difference could be donor structure rather than the representation.
+
+Stage 06 removes that confound by correcting *after* the representation exists, with Harmony, on both arms equally.
+
+```mermaid
+flowchart TD
+    A[("GSE200164 · 70,391 cells · 59 patients<br/>SoupX-adjusted, already QC-filtered")]
+
+    subgraph PCAARM["PCA arm — expression reduced to components"]
+        B["<b>SCTransform</b> per sample · 59 runs<br/>1,000 variable genes · ncells = 10,000<br/>regress nCount, nFeature, percent.mt<br/><code>vst.flavor = &quot;v1&quot;</code><br/><i>reused from Stage 03, not recomputed</i>"]
+        C["<b>select integration features</b><br/>request 3,000 → full pool ~2,816<br/>intersect: genes present in all 59 samples"]
+        D["<b>merge the 59 samples</b><br/><i>no anchors, no IntegrateData</i><br/>patient differences deliberately left in"]
+        E["<b>ScaleData</b> · centre and unit-variance<br/>per gene, across all cells"]
+        F["<b>PCA</b> · 50 components computed"]
+    end
+
+    subgraph SCARM["scGPT arm — expression read by a pretrained model"]
+        G["<b>vocabulary match</b><br/>15,960 of 19,689 genes kept"]
+        H["<b>per-cell quantile binning</b> · 51 bins<br/><i>ranks within each cell — this is scGPT's<br/>normalization, replacing SCTransform</i>"]
+        I["<b>random gene sampling</b> · max 1,200/cell<br/><i>affects 83% of cells · unseeded</i>"]
+        J["<b>frozen scGPT</b> whole-human · no fine-tuning<br/>512 dimensions per cell · unit length"]
+    end
+
+    K["<b>Harmony batch correction</b><br/>group.by.vars = patient<br/>on 50 PCs"]
+    L["<b>Harmony batch correction</b><br/>group.by.vars = patient<br/>on 512 dimensions"]
+
+    M["<b>uncorrected control</b><br/><code>pca_raw</code> · PCs 1–15"]
+    N["<code>pca_harmony</code> · PCs 1–15<br/><code>pca_harmony_30dims</code> · PCs 1–30"]
+    O["<b>uncorrected control</b><br/><code>scgpt_raw</code> · all 512"]
+    P["<code>scgpt_harmony</code> · all 512"]
+
+    Q["<b>shared nearest-neighbor graph</b>"]
+    R["<b>Louvain</b> · resolution = 0.3 · seed 42"]
+    S(["5 clusterings<br/><i>identical settings — only the coordinates differ</i>"])
+
+    A --> B --> C --> D --> E --> F
+    A --> G --> H --> I --> J
+    F --> M
+    F --> K --> N
+    J --> O
+    J --> L --> P
+    M --> Q
+    N --> Q
+    O --> Q
+    P --> Q
+    Q --> R --> S
+
+    style F fill:#dbe8f5,stroke:#4a6a8a
+    style J fill:#f0dbe8,stroke:#8a4a6a
+    style K fill:#f5e6d3,stroke:#a08050
+    style L fill:#f5e6d3,stroke:#a08050
+    style S fill:#d4e8d4,stroke:#4a7a4a
+```
+
+**Where each arm handles the problems SCTransform solves.** The PCA arm normalizes sequencing depth and stabilizes variance explicitly in SCTransform, then corrects patient separately in Harmony. The scGPT arm does neither of those first two as a step: its per-cell quantile binning is a *ranking within each cell*, so dividing a cell by its library size or taking a logarithm leaves every bin unchanged. Depth normalization is absorbed rather than skipped.
+
+Two things binning does **not** absorb, and they remain as asymmetries: SCTransform also regressed out mitochondrial fraction, which ranking preserves, so that technical gradient survives only in the scGPT arm; and the two arms read different gene sets (15,960 vocabulary-matched against ~2,816 variable).
+
+The PCA arm is rebuilt without anchors rather than reusing Stage 03's components. Reusing them would leave that arm corrected twice — once by anchors, once by Harmony — while scGPT is corrected once, and the comparison would confound representation with correction method.
+
+**Stage 03 is not modified.** It remains the paper reproduction; Stage 06's PCA arm is a separate analysis that happens to share its per-sample normalizations, and its cluster count should not be read against the paper's.
+
+### What the correction did
+
+| arm | dims | clusters | smallest | donor mixing | donor NMI |
+| --- | --- | --- | --- | --- | --- |
+| `pca_raw` | 15 | 11 | 490 | 0.801 | **0.167** |
+| `pca_harmony` | 15 | 12 | 109 | **0.959** | 0.051 |
+| `pca_harmony_30dims` | 30 | 13 | 139 | 0.950 | 0.051 |
+| `scgpt_raw` | 512 | 12 | 103 | 0.806 | **0.072** |
+| `scgpt_harmony` | 512 | 11 | 110 | 0.867 | 0.051 |
+
+Donor NMI is how much of a clustering is explained by which patient a cell came from; donor mixing is the fraction of a cell's 30 neighbours from other patients, against the 0.9726 ceiling the sample sizes allow.
+
+**The confound was real, and asymmetric in scGPT's favour.** Uncorrected PCA leaked patient identity at NMI 0.167 against scGPT's 0.072 — the zero-shot embedding was already the more batch-robust of the two, the opposite of what motivated the check. Harmony brought both to 0.051, which is what makes the arms comparable.
+
+**Harmony corrected PCA more effectively than the embedding** (mixing 0.801 → 0.959 against 0.806 → 0.867), consistent with centroid-based correction working less well in 512 concentrated dimensions. The scGPT clustering also moved less: ARI 0.853 between its raw and corrected forms, against 0.519 for the PCA pair.
+
+**Correction recovered rare populations.** `pca_raw` had nothing smaller than 490 cells; after Harmony the smallest is 109. Per the diagnostic this repository uses throughout, that is the signature of rare cell types surviving rather than being absorbed. `pca_harmony` at 12 clusters with a 109-cell smallest also closely tracks Stage 03's anchor-corrected 12 and 120 — two unrelated correction methods converging on the same structure.
+
+**Cross-arm agreement is moderate:** ARI 0.584 between `pca_harmony` and `scgpt_harmony`, NMI 0.694. Related but distinguishable structure.
+
+### The age caveat
+
+Each of the 59 samples is one patient, and age, diagnosis, sex and cognitive group are all constant within a patient. Patient identity therefore determines age exactly, so removing between-patient variation removes **all** age and diagnosis signal — by construction, not as a tunable side effect.
+
+That is correct for grouping cells by type, which is all Stage 06 does. It makes the Harmony coordinates unusable for the age trajectory question: that analysis must return to uncorrected expression and test within clusters. The driver prints this warning on every run.
+
+## Stage 08 — elbow-style compactness comparison
+
+The elbow method plots how much of a dataset's spread a grouping accounts for against the number of groups, and looks for where adding groups stops helping. It normally runs with k-means, which takes the group count as an argument. **Louvain does not** — it takes a resolution, and the cluster count is an outcome.
+
+So Stage 08 sweeps resolution 0.1 → 1.0 in steps of 0.1, records whatever cluster count each setting produced, and plots against that. No k-means, no re-clustering, no change to Stage 06.
+
+```mermaid
+flowchart TD
+    A[("Stage 06 · benchmark_representations.rds<br/>Harmony-corrected coordinates, read only")]
+
+    B["<b>PCA-Harmony</b> · first 30 dims"]
+    C["<b>scGPT-Harmony</b> · all 512 dims"]
+
+    D["<b>TSS</b> · total sum of squares<br/>every cell's squared distance<br/>from the overall centroid<br/><i>fixed per representation</i>"]
+
+    E["<b>build kNN graph once</b><br/><i>resolution divides a fixed graph,<br/>it does not rebuild it</i>"]
+
+    F["<b>Louvain</b> · resolution 0.1 → 1.0, step 0.1<br/>seed 42 · algorithm 1<br/><i>record actual cluster count</i>"]
+
+    G["<b>WCSS</b> · within-cluster sum of squares<br/>squared distance to each cell's<br/>own cluster centroid"]
+
+    H["<b>normalized WCSS</b> = WCSS / TSS<br/><i>1 = one cluster · 0 = perfectly tight</i>"]
+
+    I{"resolution 0.3 reproduces<br/>Stage 06's cluster count?"}
+    J["<b>stop</b> — the sweep is not clustering<br/>the way Stage 06 did"]
+
+    K(["two curves vs. actual cluster count<br/>normalized WCSS · and 1 − normalized WCSS"])
+
+    A --> B & C
+    B --> D
+    C --> D
+    D --> E --> F --> G --> H --> I
+    I -->|no| J
+    I -->|yes| K
+
+    style B fill:#dbe8f5,stroke:#4a6a8a
+    style C fill:#f0dbe8,stroke:#8a4a6a
+    style J fill:#f5d5d5,stroke:#a05050
+    style K fill:#d4e8d4,stroke:#4a7a4a
+```
+
+The sweep passes through resolution 0.3, the setting every other stage reports, so the script hard-fails if it does not reproduce Stage 06's 13 and 11 clusters there. Without that check a silently different clustering procedure would still draw a plausible curve.
+
+### PCA-Harmony, 30 dimensions
+
+Total sum of squares: 24,683,610.
+
+| resolution | clusters | normalized WCSS | dispersion explained |
+| --- | --- | --- | --- |
+| 0.1 | 8 | 0.4147 | 0.5853 |
+| 0.2 | 12 | 0.3356 | 0.6644 |
+| **0.3** | **13** | **0.3219** | **0.6781** |
+| 0.4 | 13 | 0.3234 | 0.6766 |
+| 0.5 | 15 | 0.3047 | 0.6953 |
+| 0.6 | 17 | 0.2999 | 0.7001 |
+| 0.7 | 18 | 0.2973 | 0.7027 |
+| 0.8 | 17 | 0.2973 | 0.7027 |
+| 0.9 | 19 | 0.2903 | 0.7097 |
+| 1.0 | 18 | 0.2907 | 0.7093 |
+
+**The bend sits at 12–13 clusters, and resolution 0.3 lands on it.** Going 8 → 13 clusters buys 0.093 of normalized WCSS; going 13 → 19 buys only 0.032 while adding nearly half again as many clusters — about three times the return per cluster before the bend as after.
+
+That is an independent check on a parameter this project inherited rather than tuned: resolution 0.3 came from the authors, and the compactness curve agrees with it.
+
+**Resolution is not monotonic in cluster count.** 0.7 → 18, 0.8 → 17, 0.9 → 19, 1.0 → 18. Louvain is a heuristic, so a higher resolution does not strictly mean more clusters, and normalized WCSS ticks up slightly twice for the same reason. Read the curve as a trend, not point by point.
+
+### scGPT-Harmony, 512 dimensions
+
+| resolution | clusters | normalized WCSS | dispersion explained |
+| --- | --- | --- | --- |
+| 0.1 | 8 | 0.4996 | 0.5004 |
+| 0.2 | 10 | 0.4485 | 0.5515 |
+| **0.3** | **11** | **0.4438** | **0.5562** |
+| 0.4 | 13 | 0.4259 | 0.5741 |
+| 0.5 | 15 | 0.4102 | 0.5898 |
+| 0.6 | 16 | 0.4015 | 0.5985 |
+| 0.7 | 18 | 0.3906 | 0.6094 |
+| 0.8 | 20 | 0.3872 | 0.6128 |
+| 0.9 | 19 | 0.3877 | 0.6123 |
+| 1.0 | 20 | 0.3877 | 0.6123 |
+
+![Normalized WCSS against cluster count for both representations](Age_trajectory/results/wcss_sweep/wcss_compactness.png)
+
+### Reading the two curves
+
+**Heights are not comparable.** The curves live in different spaces — 30 principal components against 512 learned dimensions — and squared distance is not the same quantity in each. Dividing by total spread puts both on 0–1 but does not fix that: dispersion distributes differently in high dimensions, so the vertical gap reflects dimensionality as much as compactness. **The PCA curve sitting below the scGPT curve is not evidence that PCA clusters better.**
+
+**Shape is comparable**, and the two shapes differ:
+
+| | PCA-Harmony | scGPT-Harmony |
+| --- | --- | --- |
+| WCSS at 8 clusters | 0.4147 | 0.4996 |
+| WCSS at ~19–20 clusters | 0.2903 | 0.3872 |
+| total drop across the sweep | **0.124** | **0.112** |
+| drop by 13 clusters | **0.093 (75% of total)** | 0.074 (66% of total) |
+| bend | **12–13 clusters** | **~16–18 clusters** |
+
+**PCA bends earlier and harder.** It banks three quarters of its total improvement by 13 clusters and is flat thereafter — 13 → 19 buys only 0.032. scGPT keeps improving further out: it is still gaining measurably at 16 and 18 clusters, and only flattens near 20.
+
+That is a real difference in how structure is organized. PCA-Harmony concentrates its separable structure into around a dozen groups; scGPT-Harmony's structure keeps subdividing usefully past that point, which is consistent with the embedding carrying finer distinctions that 30 principal components compress away.
+
+**Resolution 0.3 sits differently on each curve.** For PCA it lands on the bend — an independent check on a parameter this project inherited from the authors rather than tuned. For scGPT it lands *before* the bend, at 11 clusters, on a part of the curve still descending. Applying the authors' resolution to the embedding therefore under-divides it relative to where its own compactness curve flattens.
+
+**Neither curve reaches a low absolute value.** Both plateau around 0.29–0.39 normalized WCSS, meaning roughly a third of each representation's total dispersion remains within clusters at any resolution tried. Immune populations in CSF form gradients rather than isolated islands, so no partition into a dozen or two groups will be tight — the elbow locates where subdivision stops paying, not a point where the clusters become compact.
+
+**Resolution is not monotonic in cluster count** in either arm (PCA: 0.7 → 18, 0.8 → 17; scGPT: 0.8 → 20, 0.9 → 19). Louvain is a heuristic, so the plotted lines double back slightly. Read the trend, not individual points.
+
+```bash
+python scripts/08_wcss_resolution_sweep.py
+```
+
+Outputs land in `Age_trajectory/results/wcss_sweep/` — `wcss_resolution_sweep.csv`, `wcss_compactness.png`, and `wcss_dispersion_explained.png`.
+
+## Future — silhouette comparison
+
+`scripts/07_silhouette_comparison.py` and its R companion are written but **not run**, and no results from them appear here.
+
+Stage 08 measures compactness of the partition as a whole. Silhouette would measure it per cell — how far each cell sits from its own cluster against the nearest cluster it does not belong to — which gives a per-cluster breakdown and shows which specific populations are well-defined rather than one number for the partition.
+
+The design scores each partition in **both** spaces, since distances in 30 principal components and 512 learned dimensions are not the same quantity:
+
+| | scored in PCA space | scored in scGPT space |
+| --- | --- | --- |
+| **`pca_harmony_30dims` labels** | native | cross |
+| **`scgpt_harmony` labels** | cross | native |
+
+Comparisons run down a column, where the geometry is fixed. A partition winning in both columns is better defined regardless of where it is measured; one winning only in its own column shows the difference was geometry.
+
+**A first run was discarded.** It rescaled every dimension to equal variance before measuring distance, which on the PCA side promotes the trailing components — mostly noise — to the same weight as the leading ones carrying the biology. The first principal component here spans about ten times the spread of the thirtieth, and measured that way the PCA clusters scored 0.008 with 54% of cells apparently misassigned, against 0.123 with 22% on the components as they are. The script now uses the coordinates exactly as the clustering used them.
+
+Two limits would remain. Cluster counts are not equalized, 13 against 11, and silhouette rewards coarser partitions. And silhouette measures geometric separation, not biological correctness — which needs marker annotation that does not exist for these cells.
 
 ## Future cluster labeling from gene expression
 
