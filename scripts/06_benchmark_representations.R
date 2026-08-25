@@ -506,6 +506,11 @@ write.csv(
 )
 saveRDS(reference, file.path(output_dir, "benchmark_representations.rds"), compress = FALSE)
 
+# Figures for every stage are collected in results/figures/ so the report can link
+# them from one place; each stage's bulky data stays in its own directory.
+figures_dir <- file.path(dirname(output_dir), "figures")
+dir.create(figures_dir, recursive = TRUE, showWarnings = FALSE)
+
 # The two corrected arms side by side, coloured by cluster. The panels are separate
 # layouts of separate coordinates, so a cluster's position in one has no relationship
 # to a position in the other; only the grouping structure is comparable.
@@ -521,7 +526,7 @@ for (arm_name in c("pca_harmony", "scgpt_harmony")) {
     theme_classic() +
     ggtitle(paste0(arm_name, ", Louvain resolution ", CLUSTER_RESOLUTION))
   ggsave(
-    file.path(output_dir, paste0("benchmark_", arm_name, "_umap.png")),
+    file.path(figures_dir, paste0("06_", arm_name, "_umap.png")),
     figure,
     width = 8,
     height = 6,

@@ -51,7 +51,7 @@ class PipelinePaths:
     # the cluster table, and the figure.
     @property
     def figure1d_dir(self) -> Path:
-        return self.workspace / "results" / "figure1d_python"
+        return self.workspace / "results" / "03_seurat_reproduction"
 
     # Where Stage 02 left the data for R to pick up, if it needed to write it.
     @property

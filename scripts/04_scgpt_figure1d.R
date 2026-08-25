@@ -243,10 +243,19 @@ plot <- DimPlot(
     figure_width_inches * figure_dpi,
     figure_height_inches * figure_dpi
   ),
-  pt.size = 1
+  # Two rather than Stage 03's three. This embedding separates its clusters into
+  # compact, well-spaced islands, so it needs less ink than Stage 03's single
+  # overlapping mass to read clearly, and a smaller size keeps the sparse cluster 12
+  # filament and the cluster 11 arc visible rather than thickening them.
+  pt.size = 2
 ) + ggtitle("scGPT embedding, Louvain resolution 0.3")
+# Figures for every stage are collected in results/figures/ so the report can link
+# them from one place; each stage's bulky data stays in its own directory.
+figures_dir <- file.path(dirname(output_dir), "figures")
+dir.create(figures_dir, recursive = TRUE, showWarnings = FALSE)
+
 ggsave(
-  filename = file.path(output_dir, "figure1d_scgpt_clusters.png"),
+  filename = file.path(figures_dir, "04_scgpt_raw_umap_clusters.png"),
   plot = plot,
   width = figure_width_inches,
   height = figure_height_inches,

@@ -79,7 +79,7 @@ class PipelinePaths:
     # this stage's starting point, and its cell list is used to check correspondence.
     @property
     def pca_arm_dir(self) -> Path:
-        return self.workspace / "results" / "figure1d_python"
+        return self.workspace / "results" / "03_seurat_reproduction"
 
     @property
     def sct_dir(self) -> Path:
@@ -88,7 +88,7 @@ class PipelinePaths:
     # This stage's results, kept apart from both earlier arms so nothing collides.
     @property
     def benchmark_dir(self) -> Path:
-        return self.workspace / "results" / "benchmark"
+        return self.workspace / "results" / "06_harmony_benchmark"
 
     @property
     def r_input_dir(self) -> Path:

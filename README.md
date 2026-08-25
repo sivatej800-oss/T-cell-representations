@@ -1,14 +1,54 @@
-# GSE200164 Figure 1D Reproduction
+# PCA vs. scGPT on GSE200164 CSF immune cells
 
-This repository reproduces the clustering workflow used for Figure 1D of Piehl et al. from the public GSE200164 single-cell RNA-seq dataset: **70,391 CSF immune cells from 59 individuals**.
+This repository compares two cell representations — PCA on SCTransformed expression, and a frozen scGPT embedding — on the public GSE200164 single-cell RNA-seq dataset: **70,391 CSF immune cells from 59 individuals**. The two are benchmarked first on cell-state structure, then on patient-level aging and cognitive-impairment biology. [The two benchmarks](#the-two-benchmarks) states both questions.
 
-The reproduction generates an integrated UMAP of unsupervised clusters. The published figure is a later, annotated result, in which the authors used marker genes and separate reclustering of T cells and monocytes to assign final cell-type labels.
+The baseline for that comparison is a reproduction of the clustering workflow behind Figure 1D of Piehl et al., which generates an integrated UMAP of unsupervised clusters. The published figure is a later, annotated result, in which the authors used marker genes and separate reclustering of T cells and monocytes to assign final cell-type labels.
 
 The image below is the corrected pipeline's own result: 12 unsupervised clusters over all 70,391 cells, after the integration-feature correction described in [Result and the cluster-count difference](#result-and-the-cluster-count-difference).
 
-![Unsupervised UMAP from the Seurat arm: 70,391 CSF immune cells in 12 clusters](Age_trajectory/results/figure1d_python/figure1d_unsupervised_clusters.png)
+![Unsupervised UMAP from the Seurat arm: 70,391 CSF immune cells in 12 clusters](Age_trajectory/results/figures/03_seurat_umap_clusters.png)
 
 **Stage 03, the Seurat arm.** SCTransform per sample, integration over the full 2,816-gene candidate pool, PCs 1–15, Louvain at resolution 0.3. Clusters are numbered, not identified — the authors' cell-type names come from the marker and reclustering steps this reproduction stops short of. Cluster sizes run from 18,533 cells down to 787, the two smallest being the 976-cell cluster 10 and the 787-cell cluster 11; the earlier 2,000-feature run bottomed out at 671 with nothing below it.
+
+## The two benchmarks
+
+Reproducing Figure 1D is the starting point, not the goal. The goal is to compare two ways of representing a cell — PCA on SCTransformed expression, and a frozen scGPT embedding — on two different scientific questions. They are separate benchmarks with separate correction requirements, and they can produce different winners.
+
+**Benchmark 1 — cell-state structure.** *Which representation organizes cells into cleaner, donor-independent cell populations?* Batch-corrected PCA against batch-corrected scGPT. Batch correction belongs here: a CD8 T cell from patient A should sit with a CD8 T cell from patient B, not in a "patient A" cluster. This is Stages 06–08, and it breaks into several tests:
+
+| test | what it asks | stage |
+| --- | --- | --- |
+| donor mixing / donor NMI | are clusters driven by patient identity instead of shared biology? | 06 |
+| silhouette | are clusters compact and separated? | 07 |
+| WCSS sweep | how does compactness change as Louvain makes more communities? *(supporting)* | 08 |
+| PCA-512 control | is scGPT's advantage just having more dimensions? | 10–11 |
+| marker analysis | do clusters correspond to real immune cell types? | not yet written |
+
+**Benchmark 2 — patient biology.** *Which representation better preserves variation associated with healthy aging and cognitive impairment?* Patient-preserving PCA against patient-preserving scGPT. Not yet run.
+
+The correction requirement inverts here. Age, sex, and diagnosis are constant within a patient, so Harmony's removal of between-patient variation deletes the entire signal this benchmark is looking for — see [the age caveat](#the-age-caveat). Benchmark 2 therefore uses Benchmark 1 only for its cell-type labels, then returns to a representation that keeps patient variation, and pools cells to **patient × cell type**, making the patient rather than the cell the independent unit:
+
+```
+patient A's CD8 cells  →  one CD8 state vector for patient A
+patient B's CD8 cells  →  one CD8 state vector for patient B
+```
+
+Two questions follow. First, healthy aging: fit a cell-type-specific trajectory over cognitively healthy patients only, `H_pc = f_c(age_p, sex_p)`, and ask whether patient-level cell state changes predictably with age. Second, cognitive impairment: a 74-year-old CI patient is compared not against all healthy patients but against the expected state of a healthy 74-year-old, `D_pc = H_pc − f_c(age_p, sex_p)`, and the test is whether CI patients deviate systematically.
+
+## Where the results are
+
+Every figure and table is inventoried in **[`Age_trajectory/results/README.md`](Age_trajectory/results/README.md)**. Figures are collected in [`Age_trajectory/results/figures/`](Age_trajectory/results/figures/); each stage's data stays in its own numbered directory.
+
+| stage | what it produced | figure |
+| --- | --- | --- |
+| **03** Seurat reproduction | 12 clusters, anchor-integrated | [UMAP](#result-and-the-cluster-count-difference) |
+| **04** scGPT embedding | 13 clusters, frozen, uncorrected | [UMAP](#stage-04--the-scgpt-comparison) |
+| **06** Harmony benchmark | 5 arms, donor leakage removed | [three layouts](#the-three-layouts) |
+| **07** silhouette | native and matched widths, both spaces | [matched 2×2](#matched-widths--512-against-512) |
+| **08** WCSS sweep | the elbow, resolution 0.1 → 1.0 | [compactness](#stage-08--elbow-style-compactness-comparison) |
+| **10** PCA-512 control | 9 clusters, rare populations lost | [UMAP](#stage-10--pca-at-the-embeddings-width) |
+| **14** marker evidence | canonical panel over both layouts | [feature plots](#stage-14--the-authors-marker-evidence-drawn-for-both-arms) |
+| **15** annotation | five cell types, both arms, by hand | [cell types](#the-two-arms-agree-at-this-resolution) |
 
 ## What the authors did
 
@@ -73,20 +113,22 @@ flowchart LR
         direction TB
         P1["deposited GEO matrix<br/><i>already the output of step 1</i>"]
         P2["Stages 01–03"]
-        P3["not yet reproduced<br/><i>the labeling work below</i>"]
-        P1 --> P2 --> P3
+        P3["Stages 06–11<br/><i>the PCA vs. scGPT comparison,<br/>which the authors did not run</i>"]
+        P4["Stages 12–13<br/><i>markers on frozen labels</i>"]
+        P5["not yet reproduced<br/><i>cluster labeling · reclustering</i>"]
+        P1 --> P2 --> P3 --> P4 --> P5
     end
 
     S1 -.-> P1
     S2 -.-> P2
     S6 -.-> P2
-    S7 -.-> P3
+    S7 -.-> P4
+    S8 -.-> P5
 
     style S1 fill:#e8e8e8,stroke:#666
-    style S7 fill:#f5e6d3,stroke:#a08050
     style S8 fill:#f5e6d3,stroke:#a08050
     style P1 fill:#e8e8e8,stroke:#666
-    style P3 fill:#f5e6d3,stroke:#a08050
+    style P5 fill:#f5e6d3,stroke:#a08050
 ```
 
 The work is split across three scripts, run in order. Each writes its result to disk and the next reads that file, so a stage can be re-run without repeating the ones before it.
@@ -180,7 +222,7 @@ The resolution is not tuned to force 13, and `vst.flavor = "v1"` stays set. Clus
 
 ## Stage 04 — the scGPT comparison
 
-This arm replaces the PCA-based cell representation with a frozen scGPT embedding and keeps everything downstream identical. It has been run: `scripts/04_scgpt_figure1d.py` starts `04_scgpt_figure1d.R`, and the results are in `Age_trajectory/results/figure1d_scgpt/`.
+This arm replaces the PCA-based cell representation with a frozen scGPT embedding and keeps everything downstream identical. It has been run: `scripts/04_scgpt_figure1d.py` starts `04_scgpt_figure1d.R`, and the results are in `Age_trajectory/results/04_scgpt_embedding/`.
 
 The diagram below shows **both arms side by side**, not Stage 04 alone. Stage 04 is only the right-hand branch; the left-hand branch is Stage 03, a separate script. Neither arm is batch-corrected against the other's method here — that asymmetry is what Stage 06 later exists to remove.
 
@@ -223,38 +265,32 @@ flowchart TD
 
 Only the representation differs. Both arms run the same Seurat 5.5.1 code at the same settings with the same seed, so a difference in the result points at the representation rather than at the tooling.
 
-**One departure is unavoidable.** Stage 03 takes principal components 1–15, which is meaningful because PCA orders its output by variance captured — the tail is discardable noise. An scGPT embedding has no such ordering: its 512 dimensions are learned jointly and none is privileged, so there is no leading 15 to take. All 512 are used, as these embeddings are normally consumed. The vectors are unit length, so no dimension dominates the distance through scale alone.
+**One departure is unavoidable.** Stage 03 takes PCs 1–15 because PCA orders its output by variance captured. An scGPT embedding has no such ordering — its 512 dimensions are learned jointly and none is privileged — so all 512 are used, as these embeddings are normally consumed. The vectors are unit length, so no dimension dominates through scale alone.
 
-**The two arms skip very different amounts of work.** Stage 04 runs only the bottom row of the diagram — no SCTransform, no anchor finding, no integration, no PCA. It finished in about 7 minutes against Stage 03's roughly 90, but the comparison is not like for like: the embedding itself cost 618 seconds on an L4 GPU in a separate session. The deeper difference is that scGPT never performs explicit batch correction. It is trusted to place a CD8 T cell in a similar region regardless of which of the 59 samples it came from, because it was pretrained across tens of millions of cells. That assumption is one of the things this comparison exists to test — if the scGPT clusters segregate by `internal_sample_id`, the speed came at the cost of uncorrected batch effects.
+**scGPT never performs explicit batch correction.** It is trusted to place a CD8 T cell in a similar region regardless of which of the 59 samples it came from, because it was pretrained across tens of millions of cells. Testing that assumption is what Stage 06 exists for.
 
-![UMAP from the scGPT arm: the same 70,391 cells in 13 clusters, from a frozen embedding](Age_trajectory/results/figure1d_scgpt/figure1d_scgpt_clusters.png)
+![UMAP from the scGPT arm: the same 70,391 cells in 13 clusters, from a frozen embedding](Age_trajectory/results/figures/04_scgpt_raw_umap_clusters.png)
 
-**Stage 04, the scGPT arm — the same 70,391 cells, grouped from a frozen embedding instead of from PCA.** Read against the Seurat figure above, which is drawn at the same size, palette, and settings so the two can be compared directly. This arm returns 13 clusters to Stage 03's 12, and splits them further at the small end: five clusters under 1,000 cells against Stage 03's two, down to 103 cells in cluster 12. Whether that finer division reflects real populations the PCA arm merged, or uncorrected batch structure of the kind Stage 03 removes explicitly, is not settled by the layout alone — cluster labels have not been assigned from marker genes in either arm, and the donor-mixing check that would distinguish the two readings is the comparison this figure sets up rather than one it answers.
+**Stage 04, the scGPT arm — the same 70,391 cells from a frozen embedding instead of from PCA.** Drawn at the same size, palette, and settings as the Seurat figure above so the two can be compared directly. This arm returns 13 clusters to Stage 03's 12 and splits them further at the small end: five clusters under 1,000 cells against Stage 03's two, down to 103 cells. Whether that finer division reflects real populations or uncorrected batch structure is what Stage 06's donor-mixing check answers.
 
 ### The genes scGPT never saw
 
-scGPT does not consume expression as a vector in the dataset's column order. It reads genes as tokens looked up in a vocabulary frozen at pretraining. Of this dataset's 19,689 gene symbols, **15,960 (81.1%) matched a token and 3,729 did not** — and the unmatched ones were dropped before the model saw a single cell. Because this is a frozen zero-shot embedding, nothing downstream compensates.
+scGPT reads genes as tokens from a vocabulary frozen at pretraining, so genes it does not know are dropped before the model sees a cell. Of this dataset's 19,689 gene symbols, **15,960 (81.1%) matched and 3,729 did not**. Because the embedding is frozen and zero-shot, nothing downstream compensates.
 
-That made the loss look severe, and it is worth recording why it is not, because the raw gene count is misleading by a factor of sixteen.
-
-**Which genes were dropped.** The vocabulary is in this repository at `archive/vendor/scGPT-main/scgpt/tokenizer/default_census_vocab.json`. Its 60,694 tokens reproduce the run's split exactly — 15,960 matched, 3,729 dropped — which identifies it as the gene content the run used, even though the model's own `vocab.json` carries a different checksum for prepending special tokens. The dropped set is 3,420 clone-based loci (`AC016831.7`), about 110 further lncRNAs, antisense transcripts, pseudogenes and uncharacterized ORFs, and **198 conventional HGNC-style symbols**. Not one of 65 canonical CSF and immune markers was dropped; `PPBP`, `HBB`, `PF4` and `SDC1` are absent from the dataset itself, unrelated to scGPT.
-
-The 198 conventional symbols are nomenclature drift, not missing biology. The dataset's names come from a GRCh38 CellRanger reference predating HGNC renames the vocabulary already reflects — roughly 90 histone genes (`HIST1H2BK` → `H2BC12`, `H3F3B` → `H3-3B`), about 20 aminoacyl-tRNA synthetases that gained a numeric suffix (`AARS` → `AARS1`), the membrane-associated RING finger genes renamed away from Excel date coercion (`MARCH1` → `MARCHF1`), and characterized genes that outgrew placeholder names (`TMEM173` → `STING1`, `FAM49A` → `CYRIA`). scGPT knows every one of these genes under its current symbol.
-
-**How much signal was lost.** Counting genes weights a never-expressed clone-based locus the same as a histone transcribed in every cell, so the more honest measure sums the expression behind each side of the split. Over the matrix scGPT actually ingested:
+The raw gene count overstates the loss by a factor of sixteen:
 
 | | genes | share of total expression |
 | --- | --- | --- |
 | kept | 15,960 (81.1%) | **98.862%** |
 | dropped | 3,729 (18.9%) | **1.138%** |
 
-**scGPT retained 98.86% of the transcriptomic signal.** The dropped 1.1% is concentrated rather than diffuse: the top 20 dropped genes carry 47.6% of it, and they are almost entirely the renamed histones — `H3F3B` alone accounts for 0.148% of all expression in the dataset, an eighth of everything lost. The 3,420 clone-based loci together contribute less than the histone cluster, and 81 dropped genes have no expression anywhere at all.
+**scGPT retained 98.86% of the transcriptomic signal.** The dropped set is overwhelmingly clone-based loci (3,420 of them, e.g. `AC016831.7`), lncRNAs, pseudogenes, and 198 conventional symbols that are nomenclature drift rather than missing biology — the dataset's GRCh38 reference predates HGNC renames the vocabulary already reflects (`HIST1H2BK` → `H2BC12`, `AARS` → `AARS1`, `TMEM173` → `STING1`). scGPT knows those genes under their current names.
 
-**What this settles.** The concern that motivated the check was that a rare-population marker had fallen into the gap, giving any B-cell or plasma-cell difference between the arms two candidate explanations. It had precedent: cutting ~800 integration features destroyed exactly those populations, because which genes are dropped matters more than how many. That concern is now closed. No lineage marker was dropped, and 1.1% of signal cannot account for a population-level difference.
+**What this settles.** The concern was that a rare-population marker had fallen into the gap, which would give any B-cell or plasma-cell difference between the arms two candidate explanations. Not one of 65 canonical CSF and immune markers was dropped, and 1.1% of signal cannot account for a population-level difference. That concern is closed.
 
-**What it does not settle.** The loss is not spread evenly across biology. Histones and tRNA synthetases are proliferation and translational-capacity signal, so if any cluster turns out to be defined by cell-cycle state, the scGPT arm saw a weakened version of that axis. That is a narrow caveat rather than the broad one it replaces, but it is the honest residue.
+**What it does not settle.** The loss is concentrated in histones and tRNA synthetases — proliferation and translational-capacity signal. If a cluster turns out to be defined by cell-cycle state, the scGPT arm saw a weakened version of that axis.
 
-Every figure above is produced by `scripts/05_audit_scgpt_gene_coverage.py`, which reads the matrix scGPT was actually given and writes its full report — the dropped-gene list, the name classes, the per-gene expression ranking, and the marker check — to `scgpt_gene_coverage_audit.json`. It refuses to run if the vendored vocabulary does not reproduce the run's recorded matched-gene count, so a mismatched vocabulary fails loudly rather than producing a plausible wrong answer.
+`scripts/05_audit_scgpt_gene_coverage.py` produces the full report in `scgpt_gene_coverage_audit.json`. It refuses to run if the vendored vocabulary at `archive/vendor/scGPT-main/scgpt/tokenizer/default_census_vocab.json` does not reproduce the run's recorded matched-gene count, so a mismatched vocabulary fails loudly rather than producing a plausible wrong answer.
 
 ## Stage 06 — making the two arms comparable
 
@@ -340,13 +376,153 @@ Donor NMI is how much of a clustering is explained by which patient a cell came 
 
 **Cross-arm agreement is moderate:** ARI 0.584 between `pca_harmony` and `scgpt_harmony`, NMI 0.694. Related but distinguishable structure.
 
+### The three layouts
+
+![UMAP of the uncorrected PCA control: 70,391 cells in 11 clusters](Age_trajectory/results/figures/06_pca_raw_umap.png)
+
+**`pca_raw` — the uncorrected control, 11 clusters.** This is the confound the rest of the stage exists to remove. Nothing is re-clustered — the labels are Stage 06's own and only the layout is new (`scripts/09_pca_raw_umap.R`).
+
+The same layout coloured by patient is the panel that makes the number concrete:
+
+![The same uncorrected layout coloured by patient across 59 samples](Age_trajectory/results/figures/06_pca_raw_umap_by_donor.png)
+
+**Donor NMI 0.167 is what this looks like.** The patient colours are visibly textured rather than evenly mixed — streaks and patches of single colours inside what should be one cell type. Compare the smallest cluster: 490 cells here, against 109 after correction. Rare populations are not missing because they are absent, they are absorbed into larger groups that patient structure is holding apart.
+
+![UMAP of the Harmony-corrected PCA arm: 12 clusters](Age_trajectory/results/figures/06_pca_harmony_umap.png)
+
+**`pca_harmony` — 12 clusters, donor mixing 0.959 against the 0.9726 ceiling.** It tracks Stage 03's anchor-corrected result closely (12 clusters, 109-cell smallest, against Stage 03's 12 and 120) — two unrelated correction methods converging on the same structure.
+
+![UMAP of the Harmony-corrected scGPT arm: 11 clusters](Age_trajectory/results/figures/06_scgpt_harmony_umap.png)
+
+**`scgpt_harmony` — 11 clusters from the corrected embedding.** Harmony moved this arm far less than it moved PCA, so it remains the less thoroughly corrected of the two even after the same treatment.
+
+**The three layouts are not in a shared coordinate system.** Each is a separate UMAP of separate coordinates, so a cluster's position in one panel has no relationship to its position in another. Only the grouping structure is comparable — not location, orientation, or which colour a cluster happens to receive.
+
 ### The age caveat
 
 Each of the 59 samples is one patient, and age, diagnosis, sex and cognitive group are all constant within a patient. Patient identity therefore determines age exactly, so removing between-patient variation removes **all** age and diagnosis signal — by construction, not as a tunable side effect.
 
-That is correct for grouping cells by type, which is all Stage 06 does. It makes the Harmony coordinates unusable for the age trajectory question: that analysis must return to uncorrected expression and test within clusters. The driver prints this warning on every run.
+That is correct for Benchmark 1, which only groups cells by type. It makes the Harmony coordinates unusable for Benchmark 2, which must take the cell-type labels from here but return to a patient-preserving representation to measure aging and CI effects. The driver prints this warning on every run.
+
+## Stage 07 — silhouette comparison
+
+Silhouette scores each cell on how far it sits from its own cluster against the nearest cluster it does not belong to. It runs twice here: once at the arms' native widths (30 dimensions against 512), and again at matched width once [Stage 10](#stage-10--pca-at-the-embeddings-width) has built a 512-dimension PCA arm. The second pass exists because the first cannot separate representation from dimensionality.
+
+Every partition is scored in **both** spaces, and comparisons run **down a column**, where the geometry is fixed. Never across a row: 30 dimensions and 512 dimensions produce distances of different sizes.
+
+Scores come from repeated balanced draws, not all 70,391 cells — the calculation is quadratic in cell count. Drawing proportionally from every cluster, with a floor of two cells, keeps a 25,000-cell cluster from crowding out a 110-cell one. The native pass draws 12,000 cells five times; the matched pass draws 25,000.
+
+```mermaid
+flowchart TD
+    A[("Stage 06 · benchmark_representations.rds<br/>coordinates and labels, read only<br/><i>nothing is re-clustered</i>")]
+    A2[("Stage 10 · pca512_harmony<br/><i>the matched-width control</i>")]
+
+    B["<b>PCA space</b> · 30 dims"]
+    C["<b>scGPT space</b> · 512 dims"]
+    B2["<b>PCA-512 space</b> · 512 dims"]
+
+    F{"pair every partition<br/>with every space"}
+
+    G["<b>balanced draw</b><br/>proportional per cluster<br/><i>so a 110-cell cluster survives<br/>a draw beside a 30,413-cell one</i>"]
+    H["<b>repeat 5 times</b> · seed 42 + i<br/><i>shows how much of a gap<br/>is just which cells were drawn</i>"]
+    I["<b>pairwise distances</b> within the draw"]
+    J["average <b>overall</b>, <b>per cluster</b>,<br/>and <b>fraction below zero</b>"]
+
+    L(["native 2×2 · matched 2×2"])
+    M["<b>compare down a column</b>"]
+    N["<b>never across a row</b>"]
+
+    A --> B & C
+    A2 --> B2
+    B --> F
+    C --> F
+    B2 --> F
+    F --> G --> H --> I --> J --> L
+    L --> M
+    L -.-> N
+
+    style B fill:#dbe8f5,stroke:#4a6a8a
+    style C fill:#f0dbe8,stroke:#8a4a6a
+    style N fill:#f5d5d5,stroke:#a05050
+    style L fill:#d4e8d4,stroke:#4a7a4a
+```
+
+### Native widths — 30 dimensions against 512
+
+| partition | space | | clusters | mean silhouette | sd across draws | negative fraction |
+| --- | --- | --- | --- | --- | --- | --- |
+| `pca_labels` | pca | *native* | 13 | 0.006 | 0.0017 | 55.5% |
+| `scgpt_labels` | pca | cross | 11 | 0.008 | 0.0013 | 45.5% |
+| `pca_labels` | scgpt | cross | 13 | 0.103 | 0.0011 | 19.3% |
+| `scgpt_labels` | scgpt | *native* | 11 | **0.207** | 0.0007 | **5.5%** |
+
+In PCA space the two partitions are indistinguishable — 0.006 against 0.008, a gap the size of the spread across draws. In scGPT space they separate: 0.207 against 0.103.
+
+The space dominates the partition. Every partition scores higher in scGPT coordinates, including the PCA partition itself, which improves seventeenfold — 0.006 to 0.103 — simply by being measured elsewhere. And neither partition is well separated in PCA space, where 55.5% of cells sit closer to a cluster they were not assigned to. CSF immune populations form gradients, and 30 principal components render them as one largely continuous mass.
+
+That leaves two readings this pass cannot separate: the embedding organizes these cells better, or silhouette behaves differently in 512 dimensions than in 30. Distances concentrate in high dimensions, and silhouette is built from distances, so width moves the score on its own.
+
+### Matched widths — 512 against 512
+
+Both spaces 512 dimensions, both partitions Harmony-corrected and clustered at resolution 0.3 with the same seed. PCA-30 is carried along as a control showing what changes when only the scoring space widens.
+
+| partition | scored in PCA-512 | scored in scGPT-512 |
+| --- | --- | --- |
+| **PCA-512 labels** (9 clusters) | **−0.033** *(native)* | 0.160 |
+| **scGPT labels** (11 clusters) | −0.048 | **0.219** *(native)* |
+| *PCA-30 labels* (13, carried) | *−0.042* | *0.107* |
+
+![Silhouette at matched dimensionality: both PCA-512 scores negative, both scGPT-space scores well above zero](Age_trajectory/results/figures/11_silhouette_matched.png)
+
+The dimensionality explanation is refuted. Give PCA the embedding's exact width and it degrades rather than improves: PCA-30 scored 0.006 in its own space above, PCA-512 scores **−0.033** in its own space here.
+
+PCA-512 space is not a usable geometry at all. Every partition scores negative there, with **73–79% of cells closer to a cluster they were not assigned to** — including PCA-512's own labels in PCA-512's own space, at 73%.
+
+The cluster-count caveat does not rescue it. Silhouette rewards coarser partitions, and PCA-512 is the coarser one here — 9 clusters against 11. That bias runs in PCA's favour and PCA still loses in scGPT space, 0.160 to 0.219. The remaining asymmetry works against the conclusion, which is what makes it safe to draw.
+
+### Per-cluster, in each partition's own space
+
+| | PCA-512 labels | scGPT labels |
+| --- | --- | --- |
+| clusters scoring above zero | **4 of 9** | **11 of 11** |
+| largest cluster | 25,820 cells at −0.100 | 30,413 cells at 0.237 |
+| smallest cluster | 378 cells at −0.097 | 110 cells at 0.145 |
+| best cluster | 783 cells at 0.205 | 757 cells at **0.521** |
+
+![Per-cluster silhouette width for both matched partitions in their native spaces](Age_trajectory/results/figures/11_silhouette_matched_per_cluster.png)
+
+Five of PCA-512's nine clusters score negative, including its two largest — 47,241 cells together, two thirds of the dataset — and its smallest. The scGPT partition scores positive on all eleven, and its small clusters are its strongest: 0.521 at 757 cells, 0.473 at 207. PCA-512 did not merely merge rare populations into nine groups; the nine it produced do not hold together.
+
+The same pattern holds at native widths, where the means above are dominated by the largest clusters sitting in the continuum:
+
+| | best small cluster | largest cluster |
+| --- | --- | --- |
+| scGPT labels in scGPT space | 757 cells at 0.553 | 30,413 cells at 0.220 |
+| PCA labels in scGPT space | 718 cells at **0.575** | — |
+
+![Mean silhouette width per cluster, both partitions in both spaces](Age_trajectory/results/figures/07_silhouette_per_cluster.png)
+
+The small clusters both arms recover after correction are the most cleanly separated structures in the data, not marginal groups that barely cleared a threshold. The large T-cell and monocyte masses are what silhouette struggles with — precisely the populations the authors resolved by reclustering rather than on the first pass.
+
+### What this settles, and what it does not
+
+**Settled.** scGPT's advantage is not an artifact of dimensionality. The matched comparison removes that confound, and the remaining cluster-count asymmetry favours PCA, so the result survives its own most likely objection.
+
+**Not settled.** Silhouette measures geometric separation, not biological correctness. A tight group is not necessarily one cell type, and two distinct types with similar expression will always score poorly. That needs marker annotation, which is what Stage 13 begins.
+
+**Dimensions are not rescaled.** Rescaling to equal variance would promote PCA's trailing noise components to the weight of the leading ones carrying the biology — PC1 spans about ten times the spread of PC30. The coordinates are used exactly as the clustering used them.
+
+```bash
+python scripts/07_silhouette_comparison.py
+python scripts/11_silhouette_dimension_matched.py
+```
+
+Outputs land in `Age_trajectory/results/07_silhouette/` and `Age_trajectory/results/11_silhouette_matched/`.
+
 
 ## Stage 08 — elbow-style compactness comparison
+
+**This is a supporting analysis, not part of the PCA-versus-scGPT verdict.** It answers a narrower question — whether resolution 0.3, a parameter inherited from the authors rather than tuned here, sits in a sensible place for each representation. The verdict itself rests on donor mixing (Stage 06) and on silhouette at matched dimensionality ([Stage 07](#matched-widths--512-against-512)); the reason this sweep cannot carry it is the same reason the matched pass had to exist, and is spelled out under [Reading the two curves](#reading-the-two-curves) below.
 
 The elbow method plots how much of a dataset's spread a grouping accounts for against the number of groups, and looks for where adding groups stops helping. It normally runs with k-means, which takes the group count as an argument. **Louvain does not** — it takes a resolution, and the cluster count is an outcome.
 
@@ -410,8 +586,6 @@ Total sum of squares: 24,683,610.
 
 That is an independent check on a parameter this project inherited rather than tuned: resolution 0.3 came from the authors, and the compactness curve agrees with it.
 
-**Resolution is not monotonic in cluster count.** 0.7 → 18, 0.8 → 17, 0.9 → 19, 1.0 → 18. Louvain is a heuristic, so a higher resolution does not strictly mean more clusters, and normalized WCSS ticks up slightly twice for the same reason. Read the curve as a trend, not point by point.
-
 ### scGPT-Harmony, 512 dimensions
 
 | resolution | clusters | normalized WCSS | dispersion explained |
@@ -427,11 +601,11 @@ That is an independent check on a parameter this project inherited rather than t
 | 0.9 | 19 | 0.3877 | 0.6123 |
 | 1.0 | 20 | 0.3877 | 0.6123 |
 
-![Normalized WCSS against cluster count for both representations](Age_trajectory/results/wcss_sweep/wcss_compactness.png)
+![Normalized WCSS against cluster count for both representations](Age_trajectory/results/figures/08_wcss_compactness.png)
 
 ### Reading the two curves
 
-**Heights are not comparable.** The curves live in different spaces — 30 principal components against 512 learned dimensions — and squared distance is not the same quantity in each. Dividing by total spread puts both on 0–1 but does not fix that: dispersion distributes differently in high dimensions, so the vertical gap reflects dimensionality as much as compactness. **The PCA curve sitting below the scGPT curve is not evidence that PCA clusters better.**
+**Heights are not comparable.** The curves live in different spaces — 30 principal components against 512 learned dimensions — and squared distance is not the same quantity in each. Dividing by total spread puts both on 0–1 but does not fix that: dispersion distributes differently in high dimensions, so the vertical gap reflects dimensionality as much as compactness. **The PCA curve sitting below the scGPT curve is not evidence that PCA clusters better.** This is the same confound [Stage 07's matched pass](#matched-widths--512-against-512) removed by rebuilding PCA at 512 dimensions — where it scores *worse*, not better.
 
 **Shape is comparable**, and the two shapes differ:
 
@@ -457,49 +631,284 @@ That is a real difference in how structure is organized. PCA-Harmony concentrate
 python scripts/08_wcss_resolution_sweep.py
 ```
 
-Outputs land in `Age_trajectory/results/wcss_sweep/` — `wcss_resolution_sweep.csv`, `wcss_compactness.png`, and `wcss_dispersion_explained.png`.
+Outputs land in `Age_trajectory/results/08_wcss_sweep/`, and the two figures in `Age_trajectory/results/figures/`.
 
-## Future — silhouette comparison
+## Stage 10 — PCA at the embedding's width
 
-`scripts/07_silhouette_comparison.py` and its R companion are written but **not run**, and no results from them appear here.
+Stage 07's native pass left two readings it could not separate — the embedding organizes these cells better, or silhouette behaves differently at 512 dimensions than at 30. Separating them needs a PCA arm at the embedding's width.
 
-Stage 08 measures compactness of the partition as a whole. Silhouette would measure it per cell — how far each cell sits from its own cluster against the nearest cluster it does not belong to — which gives a per-cluster breakdown and shows which specific populations are well-defined rather than one number for the partition.
+Stage 10 builds that control: PCA carried to 512 components, Harmony-corrected, and clustered fresh at Stage 06's settings — same resolution, same seed, same neighbour graph. **The clustering is new, not the 30-dimension labels re-scored**, because the comparison needs a PCA-512 partition rather than the PCA-30 partition viewed from further away.
 
-The design scores each partition in **both** spaces, since distances in 30 principal components and 512 learned dimensions are not the same quantity:
+### The decomposition has to be exact
 
-| | scored in PCA space | scored in scGPT space |
-| --- | --- | --- |
-| **`pca_harmony_30dims` labels** | native | cross |
-| **`scgpt_harmony` labels** | cross | native |
+Seurat's `RunPCA` defaults to `approx = TRUE`, which uses irlba — a *truncated* method built to pull a few components from a large matrix. Asked for 512 of a possible 2,815 it returns:
 
-Comparisons run down a column, where the geometry is fixed. A partition winning in both columns is better defined regardless of where it is measured; one winning only in its own column shows the difference was geometry.
+```text
+did not converge--results might be invalid!; try increasing work or maxit
+```
 
-**A first run was discarded.** It rescaled every dimension to equal variance before measuring distance, which on the PCA side promotes the trailing components — mostly noise — to the same weight as the leading ones carrying the biology. The first principal component here spans about ten times the spread of the thirtieth, and measured that way the PCA clusters scored 0.008 with 54% of cells apparently misassigned, against 0.123 with 22% on the components as they are. The script now uses the coordinates exactly as the clustering used them.
+A non-converged decomposition still returns a full matrix of numbers. Dimension checks pass, `anyNA` passes, Harmony corrects it, Louvain clusters it, and the UMAP looks entirely ordinary. The warning is the only evidence anywhere in the pipeline that the components are untrustworthy — the exact failure mode this repository exists to guard against. Stage 10 therefore passes `approx = FALSE` for exact SVD, and promotes any convergence warning to a hard error rather than a message that scrolls past.
 
-Two limits would remain. Cluster counts are not equalized, 13 against 11, and silhouette rewards coarser partitions. And silhouette measures geometric separation, not biological correctness — which needs marker annotation that does not exist for these cells.
+### What PCA-512 produced
 
-## Future cluster labeling from gene expression
+| arm | dims | clusters | smallest |
+| --- | --- | --- | --- |
+| `pca_harmony` | 15 | 12 | 109 |
+| `pca_harmony_30dims` | 30 | 13 | 139 |
+| `scgpt_harmony` | 512 | 11 | 110 |
+| **`pca512_harmony`** | **512** | **9** | **378** |
 
-Cluster labels should be assigned from the original normalized RNA expression values — not from UMAP coordinates or embedding dimensions alone. The same workflow applies to both the PCA and scGPT clusters, so the two can be compared on the same biological evidence.
+![UMAP of the PCA-512 arm: 70,391 cells in 9 clusters](Age_trajectory/results/figures/10_pca512_harmony_umap.png)
+
+**PCA-512 lost the rare populations.** It returns the fewest clusters of any corrected arm and nothing below 378 cells, where every other arm resolves something near 110. By the diagnostic this repository uses throughout — a run with no small clusters means rare cell types were absorbed rather than resolved — adding dimensions to PCA made it worse.
+
+The variance accounting explains why. Exact SVD puts **40.27% of variance in PCs 1–30 and 59.73% in PCs 31–512**: the added components are many low-variance directions rather than a few informative ones. Euclidean distance sums across all 512, so signal that separates a rare population sharply in 30 components is diluted across roughly 482 near-noise axes, and Louvain merges what it can no longer distinguish.
+
+That is a real property of PCA at this width, not a defect in the setup. It is also the first substantive answer to the question the matched pass was built for — scored rather than inferred in [Stage 07](#matched-widths--512-against-512).
+
+```bash
+python scripts/10_pca512_arm.py
+```
+
+The PCA-512 arm's outputs land beside Stage 06's in `Age_trajectory/results/06_harmony_benchmark/`.
+
+## Stage 12 — freezing the two partitions
+
+Stages 06 through 11 compared the two representations in their own terms — silhouette, WCSS, donor mixing. None of that says whether either partition's communities are *cell types*. A partition can be geometrically clean and still cut across biology; a loose one can still land on real populations.
+
+The biological test is a **same RNA, different cluster assignments** experiment. PCA and scGPT decide which cells are grouped together; the original RNA expression says what those groups are. Because the marker evidence comes from the RNA assay and not from either representation, neither arm can grade its own work.
+
+That independence only holds if the partitions stop moving. From here the labels are an **input, never an output** — no resolution retuning, no re-clustering, no dropping cells. Stage 12 copies the two arms out of Stage 06 into their own file and records a checksum, so every later stage can prove it read the same partition.
 
 ```mermaid
 flowchart TD
-    A["differential expression<br/>each cluster vs. all remaining cells"]
-    B["rank positively enriched genes per cluster"]
-    C["inspect marker heatmaps and expression plots"]
-    D["assign broad labels<br/>from combinations of canonical markers"]
-    E{"marker expression<br/>consistent across<br/>multiple donors?"}
-    F["isolate broad T-cell and monocyte populations<br/>recluster for finer labels"]
-    G(["labeled clusters"])
-    H["keep labeled <b>ambiguous</b><br/><i>rather than forcing a cell type</i>"]
+    A[("Stage 06 · benchmark_cluster_assignments.csv.gz<br/>all five arms, read only")]
+    B[("Stage 03 · seurat_input/barcodes.tsv<br/><i>the cells the RNA will be read from</i>")]
 
-    A --> B --> C --> D --> E
-    E -->|yes| F --> G
-    E -->|no| H --> G
+    C["<b>take two arms only</b><br/>pca_harmony_30dims · scgpt_harmony<br/><i>the other three are not on trial</i>"]
 
-    style G fill:#d4e8d4,stroke:#4a7a4a
-    style H fill:#f5e6d3,stroke:#a08050
+    D{"do the labels and the RNA<br/>describe the same cells?"}
+    E["<b>same set, same order</b><br/>70,391 cells, no duplicates, no gaps"]
+    F["<b>stop</b><br/><i>a silent mismatch would attach expression<br/>to the wrong cells and produce a<br/>plausible, wrong annotation</i>"]
+
+    G["<b>SHA-256 over the label columns</b><br/><i>not the file bytes — survives a rewrite,<br/>breaks if any cell's assignment changes</i>"]
+    H(["frozen_cluster_labels.csv.gz<br/><b>pca30_harmony_cluster</b> · 13 clusters<br/><b>scgpt_harmony_cluster</b> · 11 clusters"])
+
+    A --> C --> D
+    B --> D
+    D -->|yes| E --> G --> H
+    D -->|no| F
+
+    style E fill:#dbe8f5,stroke:#4a6a8a
+    style F fill:#f5d5d5,stroke:#a05050
+    style H fill:#d4e8d4,stroke:#4a7a4a
 ```
+
+The cluster numbers carry no meaning across arms. Louvain numbers by descending size, so PCA cluster 3 and scGPT cluster 3 are unrelated — and neither has anything to do with the paper's cluster 3. What is frozen is the grouping, not the names.
+
+### Where the two partitions disagree
+
+Cross-tabulating the frozen labels shows the disagreement concentrated in one place. Most clusters map close to one-to-one, but scGPT cluster 0 — 30,413 cells, the largest in either arm — draws from five different PCA clusters:
+
+| PCA cluster | cells → scGPT 0 | of that cluster | reading |
+| --- | --- | --- | --- |
+| 0 | 23,548 | 93% | lands in scGPT 0 |
+| 8 | 1,322 | 97% | lands in scGPT 0 |
+| 2 | 3,197 | 52% | splits, rest to scGPT 4 |
+| 1 | 1,141 | 6% | mostly elsewhere |
+| 5 | 1,114 | 32% | splits, more goes to scGPT 1 |
+
+Only clusters 0 and 8 are genuinely absorbed. Clusters 2 and 5 divide between scGPT clusters, which is a different phenomenon — a boundary drawn in a different place, not a population swallowed.
+
+Either way the question is the same: is PCA resolving real subpopulations that scGPT blurs together, or splitting one population several ways? Geometry cannot settle it — only the RNA can, which is what Stages 13 and 14 do.
+
+```bash
+python scripts/12_freeze_cluster_labels.py
+```
+
+Outputs land in `Age_trajectory/results/12_frozen_labels/`. Re-running is idempotent: the stage refuses to overwrite the file with different labels, so the freeze cannot drift out from under the stages that read it.
+
+## Stage 13 — marker discovery on one shared expression object
+
+The design that makes this a comparison rather than two separate analyses: **one expression object, two sets of labels**. Not a PCA object with its own RNA and an scGPT object with its own RNA — one matrix, normalized once, with both frozen label columns attached as metadata. `FindAllMarkers` then runs twice over that single object with identical assay, slot, and thresholds.
+
+The only thing that differs between the two runs is which cells are called cluster 0.
+
+```mermaid
+flowchart TD
+    A[("Stage 03 · counts.mtx<br/>19,689 genes × 70,391 cells<br/><i>the published data, not a<br/>downstream product of either arm</i>")]
+    B[("Stage 12 · frozen_cluster_labels.csv.gz<br/><i>checksum re-verified before use</i>")]
+
+    C["<b>one Seurat object</b> · assay RNA<br/>both label sets joined <b>by barcode</b><br/><i>not by position — a positional join<br/>that silently succeeded would mislabel<br/>every cell</i>"]
+    D["<b>LogNormalize once</b> · scale factor 10,000<br/><i>normalizing once rather than per arm<br/>is what makes 'same RNA' literal</i>"]
+    E["<b>fingerprint the data layer</b><br/>sum = 176,503,092.945537<br/><i>captured before either run,<br/>so the claim that both saw one<br/>assay is checkable</i>"]
+
+    F["<b>Idents ← pca30_harmony_cluster</b><br/>13 clusters"]
+    G["<b>Idents ← scgpt_harmony_cluster</b><br/>11 clusters"]
+
+    H["FindAllMarkers · Wilcoxon via <b>presto</b><br/>min.pct 0.25 · logfc.threshold 0.25<br/><i>the authors' own thresholds</i>"]
+    I["FindAllMarkers · <b>identical parameters</b><br/>seed reset before each call<br/><i>so neither run inherits the other's state</i>"]
+
+    J{"is the data layer<br/>still the same sum?"}
+    K["<b>stop</b><br/><i>if the first run perturbed the assay,<br/>the second is not a fair comparison</i>"]
+
+    L(["markers_pca30_harmony_cluster.csv.gz<br/>markers_scgpt_harmony_cluster.csv.gz<br/>canonical_panel_by_cluster.csv"])
+
+    A --> C
+    B --> C
+    C --> D --> E
+    E --> F --> H --> J
+    E --> G --> I --> J
+    J -->|yes| L
+    J -->|no| K
+
+    style F fill:#dbe8f5,stroke:#4a6a8a
+    style G fill:#f0dbe8,stroke:#8a4a6a
+    style K fill:#f5d5d5,stroke:#a05050
+    style L fill:#d4e8d4,stroke:#4a7a4a
+```
+
+### Why RNA and not SCT
+
+The authors set `DefaultAssay(s) <- "SCT"` before their marker call, and following that literally would be wrong here. Their SCTransform ran on **one merged object**, so it covered one gene set. In this pipeline SCTransform ran **per sample**, and the 59 checkpoints do not agree on which genes they contain:
+
+| gene set | count |
+| --- | --- |
+| SCT, per sample | 10,112 – 14,923 |
+| **SCT, shared by all 59 samples** | **9,013** |
+| SCT, union across samples | 17,303 |
+| **RNA, every gene for every cell** | **19,689** |
+
+Taking the SCT intersection would discard 54% of the transcriptome, and the genes that drop are exactly the ones measured in some samples but not all — which is what a rare population's markers look like. That is the same failure the 2,000-feature integration cut caused in an earlier Stage 03, described above.
+
+RNA carries every gene for every cell, is identical for both arms, and is what the authors themselves used for their final marker heatmap. It is the assay this stage uses.
+
+### Why presto is required, not optional
+
+presto supplies a compiled Wilcoxon implementation. The stage **refuses to run without it** rather than falling back to Seurat's own — if one arm ran under presto and the other did not, a difference between their marker lists could be the implementation rather than the biology. A hard failure makes that impossible to hit by accident, and the audit records which implementation ran.
+
+```bash
+python scripts/13_marker_discovery.py
+```
+
+Outputs land in `Age_trajectory/results/13_marker_discovery/`.
+
+## Stage 14 — the authors' marker evidence, drawn for both arms
+
+Stage 13 produced two marker tables. This stage turns them into what a person actually reads before annotating: each canonical marker painted over that arm's own UMAP, plus the numbers behind the colours. Nothing is clustered, and no identity is assigned.
+
+The procedure is the authors' — their 14-gene panel, their `FeaturePlot`, their colours and point size — run twice over the one shared expression object. The only divergences are the two this project studies, plus the RNA-instead-of-SCT choice forced by per-sample SCTransform.
+
+```mermaid
+flowchart TD
+    A[("Stage 03 · counts.mtx<br/>19,689 genes × 70,391 cells")]
+    B[("Stage 12 · frozen_cluster_labels.csv.gz")]
+    C[("Stage 06 · UMAP coordinates<br/><i>read, never recomputed</i>")]
+
+    D["<b>rebuild Stage 13's object</b> · assay RNA<br/>LogNormalize, scale factor 10,000"]
+    E{"does the data layer sum<br/>match Stage 13's fingerprint?"}
+    F["<b>stop</b><br/><i>a different matrix would make the<br/>evidence and the markers disagree</i>"]
+
+    G["<b>each arm on its own layout</b><br/><i>a partition drawn over the other arm's<br/>coordinates looks incoherent for reasons<br/>that are not biological</i>"]
+
+    H["<b>FeaturePlot × 14 markers × 2 arms</b><br/>grey88 → deeppink · pt.size 1<br/><i>no <code>order = TRUE</code> — redrawing expressing<br/>cells on top makes a marker read stronger<br/>and more contiguous than it is</i>"]
+    I["<b>the numbers behind the plots</b><br/>% expressing and mean expression,<br/>per gene per cluster<br/><i>a percentage is checkable; a colour is not</i>"]
+
+    J(["14_featureplots_*.png · 14_clusters_*.png<br/>canonical_panel_by_cluster.csv<br/>cluster_evidence_table.csv"])
+
+    A --> D
+    B --> D
+    D --> E
+    E -->|no| F
+    E -->|yes| G
+    C --> G
+    G --> H --> J
+    G --> I --> J
+
+    style F fill:#f5d5d5,stroke:#a05050
+    style J fill:#d4e8d4,stroke:#4a7a4a
+```
+
+![Fourteen canonical markers over the PCA-30 Harmony UMAP](Age_trajectory/results/figures/14_featureplots_pca30_harmony_cluster.png)
+
+**PCA-30 Harmony.** CD3D covers the large left mass; CD8A/CD8B pick out its upper half and CD4 the lower; NKG7 and GNLY concentrate in the small upper cluster; CD68, CD14 and FCER1A fall on the right-hand pair; CD19 and JCHAIN mark two small clusters and nothing else.
+
+![The same fourteen markers over the scGPT Harmony UMAP](Age_trajectory/results/figures/14_featureplots_scgpt_harmony_cluster.png)
+
+**scGPT Harmony.** The same panel over the same cells in the other layout. The lineages land on separate territories here too, so the annotation below rests on the same kind of evidence in both arms — the disagreement between them is about where boundaries fall, not whether the populations are visible.
+
+Each cluster also gets one evidence row: size, how many of the 59 donors contribute, the largest donor's share, its top 20 markers, and which panel genes are present in at least 25% of its cells. That row is what Stage 15 is read off, and what makes a hand-made decision auditable afterwards.
+
+```bash
+python scripts/14_marker_evidence.py
+```
+
+Outputs land in `Age_trajectory/results/14_marker_evidence/`, with per-marker plots in `figures/14_feature_plots/`.
+
+## Stage 15 — annotation, by hand, in the authors' seven categories
+
+The authors did not compute their annotation. They read their feature plots and typed cluster numbers into a block of assignments. This stage is that block, written twice.
+
+It is deliberately not a rule engine — an earlier version inferred identities from marker thresholds and invented finer categories than a 14-gene panel can support. CD4 against CD8 against Treg, and the monocyte subtypes, come from reclustering each lineage, which has not happened. The categories here are the authors' seven, `Undetermined` included, and every cluster must receive exactly one of them before the stage will write anything.
+
+```mermaid
+flowchart TD
+    A[("Stage 14 · cluster_evidence_table.csv<br/>feature plots + panel percentages")]
+    B["<b>a person reads the evidence</b><br/><i>one decision per cluster, typed in</i>"]
+
+    C["<b>PCA-30 Harmony</b> · 13 clusters<br/>T 0,1,2,5,8,9,12 · Mono 3,7<br/>DC 4,10 · NK 6 · B 11"]
+    D["<b>scGPT Harmony</b> · 11 clusters<br/>T 0,1,4,7,10 · Mono 2,6<br/>DC 3,8 · NK 5 · B 9"]
+
+    E{"every cluster assigned once,<br/>every label one of the seven?"}
+    F["<b>stop</b><br/><i>a mistyped cluster number would<br/>silently drop cells from the figure</i>"]
+
+    G["<b>identity column per arm</b><br/>joined to the frozen labels by barcode"]
+    H(["annotated_cluster_labels.csv.gz<br/>annotation_rationale.csv<br/>15_celltypes_*.png"])
+
+    A --> B
+    B --> C --> E
+    B --> D --> E
+    E -->|no| F
+    E -->|yes| G --> H
+
+    style C fill:#dbe8f5,stroke:#4a6a8a
+    style D fill:#f0dbe8,stroke:#8a4a6a
+    style F fill:#f5d5d5,stroke:#a05050
+    style H fill:#d4e8d4,stroke:#4a7a4a
+```
+
+The cluster numbers transfer nowhere. Louvain numbers by descending size, so the authors' "cluster 7 = NK Cells" says nothing about cluster 7 here, and PCA cluster 3 has nothing to do with scGPT cluster 3. Each block above was read off its own partition's plots.
+
+![Broad cell types over the PCA-30 Harmony UMAP](Age_trajectory/results/figures/15_celltypes_pca30_harmony_cluster.png)
+
+![Broad cell types over the scGPT Harmony UMAP](Age_trajectory/results/figures/15_celltypes_scgpt_harmony_cluster.png)
+
+Colours are the authors' Figure 1D palette, so the broad plot and an eventual reclustered Figure 1D read as one family.
+
+### The two arms agree at this resolution
+
+Thirteen clusters and eleven clusters resolve to the same five populations in nearly the same proportions:
+
+| identity | PCA-30 Harmony | scGPT Harmony | difference |
+| --- | --- | --- | --- |
+| T Cells | 55,485 | 55,554 | 69 |
+| Monocytes | 7,392 | 7,471 | 79 |
+| DC | 4,931 | 4,848 | 83 |
+| NK Cells | 2,362 | 2,311 | 51 |
+| B Cells | 221 | 207 | 14 |
+
+Neither arm produced a cluster the panel could not resolve, so `Undetermined` and `Plasma Cells` go unused in both. The extra two PCA clusters are subdivisions *within* T cells — the Treg cluster 8 and the cycling cluster 12 — not a lineage scGPT missed. That is the answer to the Stage 12 question at this resolution: PCA cuts the T compartment finer, and both arms see the same cell types.
+
+```bash
+Rscript scripts/15_annotate_clusters.R \
+  Age_trajectory/results/12_frozen_labels \
+  Age_trajectory/results/14_marker_evidence \
+  Age_trajectory/results/06_harmony_benchmark \
+  Age_trajectory/results/15_annotation \
+  Age_trajectory/results/figures
+```
+
+Outputs land in `Age_trajectory/results/15_annotation/`.
 
 ## References
 

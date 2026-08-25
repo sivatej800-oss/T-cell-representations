@@ -62,11 +62,11 @@ class PipelinePaths:
 
     @property
     def benchmark_dir(self) -> Path:
-        return self.workspace / "results" / "benchmark"
+        return self.workspace / "results" / "06_harmony_benchmark"
 
     @property
     def sweep_dir(self) -> Path:
-        return self.workspace / "results" / "wcss_sweep"
+        return self.workspace / "results" / "08_wcss_sweep"
 
     def create_directories(self) -> None:
         self.sweep_dir.mkdir(parents=True, exist_ok=True)

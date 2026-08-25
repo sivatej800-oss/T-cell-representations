@@ -257,8 +257,13 @@ compactness_plot <- ggplot(
   ) +
   theme_classic() +
   theme(legend.position = "bottom")
+# Figures for every stage are collected in results/figures/ so the report can link
+# them from one place; each stage's bulky data stays in its own directory.
+figures_dir <- file.path(dirname(output_dir), "figures")
+dir.create(figures_dir, recursive = TRUE, showWarnings = FALSE)
+
 ggsave(
-  file.path(output_dir, "wcss_compactness.png"),
+  file.path(figures_dir, "08_wcss_compactness.png"),
   compactness_plot,
   width = 8,
   height = 6,
@@ -295,7 +300,7 @@ dispersion_plot <- ggplot(
   theme_classic() +
   theme(legend.position = "bottom")
 ggsave(
-  file.path(output_dir, "wcss_dispersion_explained.png"),
+  file.path(figures_dir, "08_wcss_dispersion_explained.png"),
   dispersion_plot,
   width = 8,
   height = 6,

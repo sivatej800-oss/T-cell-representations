@@ -508,11 +508,23 @@ plot <- DimPlot(
     figure_width_inches * figure_dpi,
     figure_height_inches * figure_dpi
   ),
-  # The size the authors drew each cell at in the published figure.
-  pt.size = 1
+  # Each cell is drawn three grid pixels across. The authors wrote 1, but they were
+  # not painting onto a grid: their 2021 call had no raster argument, so each cell
+  # became a real shape and size 1 was a visible dot. Rasterized at 2700 by 2100 the
+  # same 1 covers about one pixel, so even the densest part of a cluster never
+  # accumulates enough ink to read as a solid colour. Departing from their number is
+  # what preserves their appearance here. Three is the largest size that darkens the
+  # clusters while keeping the 120-cell cluster 10 and the thin cluster 11 wedge
+  # separate from their neighbours.
+  pt.size = 3
 )
+# Figures for every stage are collected in results/figures/ so the report can link
+# them from one place; each stage's bulky data stays in its own directory.
+figures_dir <- file.path(dirname(output_dir), "figures")
+dir.create(figures_dir, recursive = TRUE, showWarnings = FALSE)
+
 ggsave(
-  filename = file.path(output_dir, "figure1d_unsupervised_clusters.png"),
+  filename = file.path(figures_dir, "03_seurat_umap_clusters.png"),
   plot = plot,
   width = figure_width_inches,
   height = figure_height_inches,

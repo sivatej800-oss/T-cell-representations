@@ -59,7 +59,7 @@ class PipelinePaths:
 
     @property
     def figure1d_dir(self) -> Path:
-        return self.workspace / "results" / "figure1d_python"
+        return self.workspace / "results" / "03_seurat_reproduction"
 
     # Where the data gets handed across to R. Only needed when Stage 03 is starting
     # from nothing; a resumed run skips writing these entirely.

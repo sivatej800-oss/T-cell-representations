@@ -86,7 +86,7 @@ class PipelinePaths:
 
     @property
     def figure1d_dir(self) -> Path:
-        return self.workspace / "results" / "figure1d_python"
+        return self.workspace / "results" / "03_seurat_reproduction"
 
     @property
     def seurat_input_dir(self) -> Path:

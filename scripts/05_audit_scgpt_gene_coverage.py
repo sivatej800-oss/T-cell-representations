@@ -104,7 +104,7 @@ class PipelinePaths:
 
     @property
     def scgpt_result_dir(self) -> Path:
-        return self.workspace / "results" / "figure1d_scgpt"
+        return self.workspace / "results" / "04_scgpt_embedding"
 
 
 def default_workspace() -> Path:

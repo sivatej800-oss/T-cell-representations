@@ -74,12 +74,12 @@ class PipelinePaths:
     # the same cells in the same order. Nothing in it is written or modified.
     @property
     def pca_arm_dir(self) -> Path:
-        return self.workspace / "results" / "figure1d_python"
+        return self.workspace / "results" / "03_seurat_reproduction"
 
     # This arm's results, kept separate from Stage 03's so the two never collide.
     @property
     def scgpt_result_dir(self) -> Path:
-        return self.workspace / "results" / "figure1d_scgpt"
+        return self.workspace / "results" / "04_scgpt_embedding"
 
     # What R reads: the embedding as a flat binary block, and the per-cell details.
     @property
