@@ -187,7 +187,7 @@ The direct counterpart of the authors' steps 2 through 6:
 flowchart TD
     R1["rebuild Seurat object<br/><code>min.cells = 0, min.features = 0</code><br/><i>no thresholds — the authors' already ran</i>"]
     R2["split into 59 per-sample objects<br/><i>assert none lost</i>"]
-    R3["<b>SCTransform</b> per sample<br/>1,000 variable genes · ncells = 10,000<br/>regress the three quality measures<br/><code>vst.flavor = &quot;v1&quot;</code> set explicitly"]
+    R3["<b>SCTransform</b> per sample<br/>1,000 variable genes · ncells = 10,000<br/>regress the three quality measures<br/><code>vst.flavor = v1</code> set explicitly"]
     R4["select integration features<br/>request 3,000 → the full pool of ~2,816<br/>prepare SCT assays"]
     R5["<b>find anchors</b><br/>references A4 and A6, located by name"]
     R6["<b>integrate</b> into one assay<br/><i>assert cell count unchanged</i>"]
@@ -303,7 +303,7 @@ flowchart TD
     A[("GSE200164 · 70,391 cells · 59 patients<br/>SoupX-adjusted, already QC-filtered")]
 
     subgraph PCAARM["PCA arm — expression reduced to components"]
-        B["<b>SCTransform</b> per sample · 59 runs<br/>1,000 variable genes · ncells = 10,000<br/>regress nCount, nFeature, percent.mt<br/><code>vst.flavor = &quot;v1&quot;</code><br/><i>reused from Stage 03, not recomputed</i>"]
+        B["<b>SCTransform</b> per sample · 59 runs<br/>1,000 variable genes · ncells = 10,000<br/>regress nCount, nFeature, percent.mt<br/><code>vst.flavor = v1</code><br/><i>reused from Stage 03, not recomputed</i>"]
         C["<b>select integration features</b><br/>request 3,000 → full pool ~2,816<br/>intersect: genes present in all 59 samples"]
         D["<b>merge the 59 samples</b><br/><i>no anchors, no IntegrateData</i><br/>patient differences deliberately left in"]
         E["<b>ScaleData</b> · centre and unit-variance<br/>per gene, across all cells"]
