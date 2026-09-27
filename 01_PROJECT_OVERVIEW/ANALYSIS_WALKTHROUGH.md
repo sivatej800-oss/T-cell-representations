@@ -108,7 +108,7 @@ flowchart TD
     style R11 fill:#d4e8d4,stroke:#4a7a4a
 ```
 
-### What I did
+### What was done
 
 - **Download and audit (Stage 01).** Downloaded the GEO matrix and verified that the
   sparse conversion preserved every value exactly. The values are SoupX-corrected and
@@ -118,7 +118,7 @@ flowchart TD
 - **Clustering (Stage 03).** Reran the authors' steps 2–6 with their parameters:
   SCTransform v1 per sample, anchor integration, PCs 1–15, Louvain at 0.3.
 
-One deliberate departure: I requested the *full* ~2,816-gene pool of integration
+One deliberate departure: the reproduction requests the *full* ~2,816-gene pool of integration
 features rather than 2,000. Only ~2,816 genes are shared by all 59 samples here, and
 cutting to 2,000 discarded the rare-population markers and lost the small clusters.
 
@@ -191,14 +191,14 @@ flowchart TD
     style K fill:#d4e8d4,stroke:#4a7a4a
 ```
 
-### What I did
+### What was done
 
 - **Embedding.** Each cell was embedded with the frozen whole-human scGPT model: 512
   dimensions, no fine-tuning, no batch correction.
 - **Downstream.** The same Seurat code and settings as the PCA arm then ran on the
   embedding. Only the representation differs. All 512 dimensions are used, because an
   embedding has no variance ordering to truncate by.
-- **Gene coverage (Stage 05).** I checked what scGPT's gene vocabulary drops.
+- **Gene coverage (Stage 05).** scGPT's gene vocabulary was checked for dropped genes.
 
 **Code.** `02_CODE/04_scgpt_figure1d.py` (drives `.R`), `02_CODE/05_audit_scgpt_gene_coverage.py`.
 
@@ -276,15 +276,15 @@ flowchart TD
     style S fill:#d4e8d4,stroke:#4a7a4a
 ```
 
-### What I did
+### What was done
 
 - **Why this was needed.** Stage 03 was corrected with anchors and Stage 04 not at
   all, so a difference between them could be donor structure rather than
   representation.
-- **Rebuilding the PCA arm.** I rebuilt PCA without anchors (the same SCT
+- **Rebuilding the PCA arm.** PCA was rebuilt without anchors (the same SCT
   normalizations, merged; this is *not* Stage 03's PCA). Reusing Stage 03's PCA would
   have corrected it twice.
-- **Correcting both arms.** I applied Harmony by patient to both representations
+- **Correcting both arms.** Harmony was applied by patient to both representations
   equally. Five arms were then clustered identically: each representation raw and
   corrected, plus PCA at 30 dims.
 - **What was measured.** Donor NMI: how much of a clustering patient identity
@@ -373,9 +373,9 @@ flowchart TD
     style L fill:#d4e8d4,stroke:#4a7a4a
 ```
 
-### What I did
+### What was done
 
-I scored both corrected partitions (PCA-30, 13 clusters; scGPT, 11 clusters) in
+Both corrected partitions (PCA-30, 13 clusters; scGPT, 11 clusters) were scored in
 *both* spaces, using balanced subsamples (12,000 cells, 5 repeats) so small clusters
 count. Comparisons are only valid within one space, because distances in 30 and 512
 dimensions are different quantities.
@@ -408,10 +408,10 @@ dimensionality effect. Section 5 tests that.
 
 ## 5. PCA-512 dimensionality control
 
-### What I did
+### What was done
 
-To test whether scGPT wins only because it has 512 dimensions, I extended PCA to 512
-components using exact SVD, applied Harmony, and clustered it fresh at identical
+To test whether scGPT wins only because it has 512 dimensions, PCA was extended to 512
+components using exact SVD, Harmony-corrected, and clustered fresh at identical
 settings. Both 512-dimension partitions were then scored with silhouette, 25,000
 cells per draw, with PCA-30 carried along as a control.
 
@@ -498,11 +498,11 @@ flowchart TD
     style K fill:#d4e8d4,stroke:#4a7a4a
 ```
 
-### What I did
+### What was done
 
 Resolution 0.3 was inherited from the authors, not tuned. To see where it sits for
-each representation, I swept Louvain resolution from 0.1 to 1.0 on a fixed kNN graph
-and plotted normalized WCSS (WCSS/TSS) against the cluster count each setting
+each representation, Louvain resolution was swept from 0.1 to 1.0 on a fixed kNN graph
+and normalized WCSS (WCSS/TSS) was plotted against the cluster count each setting
 produced.
 
 **Code.** `02_CODE/08_wcss_resolution_sweep.py` (drives `.R`).
@@ -551,17 +551,6 @@ produced.
 | 1.0 | 20 | 0.3877 | 0.6123 |
 
 </details>
-
-### Conclusion
-
-**This is supporting analysis only.**
-- **Absolute WCSS cannot be compared across the two spaces.** The PCA curve sitting
-  lower is not evidence that PCA clusters better.
-- **The shapes are comparable, and they differ.** The PCA curve bends at about 12–13
-  clusters, where resolution 0.3 lands. The scGPT curve keeps improving until about
-  16–18 clusters, so 0.3 under-divides the embedding.
-- **What the shapes suggest.** scGPT may carry finer structure, which is what
-  sections 7–8 and the planned subclustering have to test biologically.
 
 ---
 
@@ -655,9 +644,9 @@ flowchart TD
     style J fill:#d4e8d4,stroke:#4a7a4a
 ```
 
-### What I did
+### What was done
 
-Geometry can't say whether a cluster is a cell type, so I let the RNA judge.
+Geometry can't say whether a cluster is a cell type, so the RNA was used to judge.
 - **Freeze (Stage 12).** The two partitions were frozen and checksummed, so they
   can't move from here on.
 - **Markers (Stage 13).** Marker discovery ran identically for both partitions on the
@@ -729,11 +718,11 @@ flowchart TD
     style H fill:#d4e8d4,stroke:#4a7a4a
 ```
 
-### What I did
+### What was done
 
-Following the authors, I assigned each cluster by hand, from its evidence row and
+Following the authors, each cluster was assigned by hand, from its evidence row and
 feature plots, to one of their seven broad categories. This is only the authors' first
-pass. Their finer labels come from reclustering, which hasn't been done yet. Cluster
+pass. Their finer labels come from reclustering, which has not been done yet. Cluster
 numbers mean nothing across arms, so each arm was read from its own plots.
 
 **Code.** `02_CODE/15_annotate_clusters.R`.
