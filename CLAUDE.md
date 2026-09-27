@@ -2,7 +2,8 @@
 
 A bioinformatics reproduction: rebuild Figure 1D of Piehl et al. 2022 (*Cell*) from
 the public GSE200164 data. The scientific result is the deliverable; the code exists
-to produce it. Read `README.md` first — it explains the biology and the analysis.
+to produce it. Read `01_PROJECT_OVERVIEW/STATUS.md` first, then
+`01_PROJECT_OVERVIEW/ANALYSIS_WALKTHROUGH.md` — it explains the biology and the analysis.
 
 ## Working here
 
@@ -85,9 +86,9 @@ wanted here.
 ## Running it
 
 ```bash
-python scripts/01_download_audit_build_anndata.py
-python scripts/02_prepare_figure1d.py
-python scripts/03_reproduce_figure1d.py
+python 02_CODE/01_download_audit_build_anndata.py
+python 02_CODE/02_prepare_figure1d.py
+python 02_CODE/03_reproduce_figure1d.py
 ```
 
 Stages 04 and 05 are the scGPT comparison arm and are independent of the three above.
@@ -96,8 +97,8 @@ Stage 04 needs the unpacked embedding bundle in `Age_trajectory/data/scgpt/` and
 finished artifacts only and can be run at any time.
 
 ```bash
-python scripts/04_scgpt_figure1d.py
-python scripts/05_audit_scgpt_gene_coverage.py
+python 02_CODE/04_scgpt_figure1d.py
+python 02_CODE/05_audit_scgpt_gene_coverage.py
 ```
 
 All three must share a workspace (default `Age_trajectory/`). Every stage resumes
@@ -109,20 +110,28 @@ SCTransform runs and costs hours.
 
 ## Layout
 
-- `scripts/` — the pipeline; the only code that runs. Stages 03 and 04 do their real
-  work in a `.R` file, started automatically by the matching `.py` file.
-- `Age_trajectory/` — generated output, resumable, git-ignored. Not source.
-- `author_reference/` — the authors' own code, their Figure 1D workflow, the paper,
-  and its published figure. Reference only; confirms nothing analytical is missing
-  from this pipeline.
-- `archive/` — superseded notebooks and a vendored scGPT source snapshot. Never run,
-  but not inert: `archive/vendor/scGPT-main/scgpt/tokenizer/default_census_vocab.json`
-  is the gene vocabulary Stage 05 audits against.
+- `README.md` — short START HERE map. `01_PROJECT_OVERVIEW/` — `STATUS.md` (done /
+  next / scope) and `ANALYSIS_WALKTHROUGH.md` (the full scientific write-up).
+- `02_CODE/` — the pipeline; the only code that runs. Stages 03 and 04 do their real
+  work in a `.R` file, started automatically by the matching `.py` file. Scripts find
+  the repo root as their parent's parent, so they must stay one level deep.
+- `03_RESULTS/` — navigation layer only: per-question READMEs plus relative symlinks
+  into `Age_trajectory/results/`. Never copy results here; add links.
+- `04_PAPER/` — outline and abstract.
+- `05_REFERENCES/` — the paper, its published figure, and the authors' own code
+  (`author_code/figure1d_author_workflow.R`). Reference only.
+- `Age_trajectory/` — the pipeline workspace: generated output, resumable,
+  git-ignored. Its `results/NN_*` stage directory names are read by the scripts and
+  must not be renamed.
+- `ARCHIVE/` — superseded human-facing material. `archive/` (lowercase) holds old
+  notebooks and a vendored scGPT source snapshot; it stays put because
+  `archive/vendor/scGPT-main/scgpt/tokenizer/default_census_vocab.json` is the gene
+  vocabulary Stage 05 audits against.
 
 ## Before committing
 
 ```bash
-python3 scripts/check_repository.py
+python3 02_CODE/check_repository.py
 ```
 
 Guards against generated data entering git.

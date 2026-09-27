@@ -5,7 +5,7 @@ It contains inputs downloaded by the pipeline, intermediate objects, audit recor
 expensive checkpoints, and final outputs. Except for this README, the directory is
 ignored by Git.
 
-Do not run files from this directory. Run the numbered commands under `scripts/` from
+Do not run files from this directory. Run the numbered commands under `02_CODE/` from
 the repository root. To use another workspace, pass the same `--workspace PATH` to
 all three stages.
 

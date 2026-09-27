@@ -312,7 +312,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     """Run the complete fifth stage from this one Python file."""
 
-    # Example: python scripts/05_audit_scgpt_gene_coverage.py
+    # Example: python 02_CODE/05_audit_scgpt_gene_coverage.py
     args = parse_args()
     audit_gene_coverage(PipelinePaths.from_workspace(args.workspace))
 

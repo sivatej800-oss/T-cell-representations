@@ -543,7 +543,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     """Run the complete second stage from this one file."""
 
-    # Example: python scripts/02_prepare_figure1d.py
+    # Example: python 02_CODE/02_prepare_figure1d.py
     args = parse_args()
     paths = PipelinePaths.from_workspace(args.workspace)
     prepare_figure1d(paths, force=args.force, rscript=args.rscript)

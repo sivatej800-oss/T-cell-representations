@@ -442,7 +442,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     """Run the complete fourth stage from this one Python file."""
 
-    # Example: python scripts/04_scgpt_figure1d.py --force
+    # Example: python 02_CODE/04_scgpt_figure1d.py --force
     args = parse_args()
     paths = PipelinePaths.from_workspace(args.workspace)
     result = run_scgpt_clustering(

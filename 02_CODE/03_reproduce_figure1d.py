@@ -267,7 +267,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     """Run the complete third stage from this one Python file."""
 
-    # Example: python scripts/03_reproduce_figure1d.py --restart-from clustering
+    # Example: python 02_CODE/03_reproduce_figure1d.py --restart-from clustering
     args = parse_args()
     # --force predates --restart-from and meant "recompute everything".
     restart_from = "all" if args.force else args.restart_from

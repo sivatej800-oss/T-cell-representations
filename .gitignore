@@ -69,3 +69,7 @@ mlruns/
 
 # Keep placeholder files in otherwise ignored output folders when explicitly added.
 !**/.gitkeep
+
+# 03_RESULTS is a navigation layer of READMEs and relative symlinks into
+# Age_trajectory/results/; track the links even where their names match patterns above.
+!03_RESULTS/**

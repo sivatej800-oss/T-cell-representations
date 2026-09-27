@@ -1006,7 +1006,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     """Run the complete first stage from this one file."""
 
-    # Example: python scripts/01_download_audit_build_anndata.py --chunk-size 100
+    # Example: python 02_CODE/01_download_audit_build_anndata.py --chunk-size 100
     args = parse_args()
     paths = PipelinePaths.from_workspace(args.workspace)
     run_data_preparation(paths, chunk_size=args.chunk_size, force=args.force)

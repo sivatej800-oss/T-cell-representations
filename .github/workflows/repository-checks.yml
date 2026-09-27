@@ -16,4 +16,4 @@ jobs:
         with:
           python-version: "3.11"
       - name: Validate repository contents
-        run: python scripts/check_repository.py
+        run: python 02_CODE/check_repository.py

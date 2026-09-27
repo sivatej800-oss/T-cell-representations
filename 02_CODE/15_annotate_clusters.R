@@ -217,7 +217,7 @@ for (partition in names(annotations)) {
 
 writeLines(jsonlite::toJSON(list(
   stage = "15_annotate_clusters",
-  method = "manual, following author_reference/figure1d_author_workflow.R lines 181-202",
+  method = "manual, following 05_REFERENCES/author_code/figure1d_author_workflow.R lines 181-202",
   categories = VALID_IDENTITIES,
   annotations = annotations,
   summaries = summaries

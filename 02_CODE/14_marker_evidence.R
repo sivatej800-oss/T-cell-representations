@@ -326,7 +326,7 @@ utils::write.csv(do.call(rbind, evidence_rows),
 
 writeLines(jsonlite::toJSON(list(
   stage = "14_marker_evidence",
-  follows = "author_reference/figure1d_author_workflow.R lines 119-140",
+  follows = "05_REFERENCES/author_code/figure1d_author_workflow.R lines 119-140",
   partitions = partitions, panel = marker_panel,
   plot_type = "FeaturePlot", feature_cols = FEATURE_COLS, feature_pt_size = FEATURE_PT_SIZE,
   assay = "RNA", assay_divergence = "authors used SCT; per-sample SCT here shares only 9013 of 19689 genes",

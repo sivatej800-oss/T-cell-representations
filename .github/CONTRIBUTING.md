@@ -7,7 +7,7 @@
 3. Keep raw data and generated analysis artifacts in the ignored local directories.
 4. Keep each numbered Python stage self-contained; do not introduce hidden imports
    between pipeline files.
-5. Run `python3 scripts/check_repository.py` before opening a pull request.
+5. Run `python3 02_CODE/check_repository.py` before opening a pull request.
 
 ## Pipeline changes
 
@@ -24,12 +24,12 @@
 - Treat everything under `archive/` as historical provenance rather than maintained
   pipeline code.
 - Place additional superseded or diagnostic notebooks under `archive/notebooks/`.
-- Keep the paper authors' own code (`figure1d_author_workflow.R` and
-  `author_preprocessing/`) separate from `scripts/`. It is reference material that
+- Keep the paper authors' own code (under `05_REFERENCES/author_code/`)
+  separate from `02_CODE/`. It is reference material that
   documents what the published analysis did; it is never run by this pipeline.
 - Keep unused third-party source snapshots under `archive/vendor/`; active dependencies
   belong in `requirements.txt` or should be installed through R.
-- Document any scientific interpretation changes in the root README or a focused reference note.
+- Document any scientific interpretation changes in `01_PROJECT_OVERVIEW/` (STATUS or ANALYSIS_WALKTHROUGH).
 
 ## Pull requests
 
