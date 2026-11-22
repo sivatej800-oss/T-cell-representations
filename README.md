@@ -9,7 +9,7 @@ Go through the folders in this order:
 | --- | --- | --- |
 | 1 | [`01_PROJECT_OVERVIEW/STATUS.md`](01_PROJECT_OVERVIEW/STATUS.md) | Research question, what's done, headline results, what's next, scope. **Read this first.** |
 | | [`01_PROJECT_OVERVIEW/ANALYSIS_WALKTHROUGH.md`](01_PROJECT_OVERVIEW/ANALYSIS_WALKTHROUGH.md) | The full scientific write-up of every stage: methods, diagrams, numbers, caveats. |
-| 2 | [`02_CODE/`](02_CODE/) | The pipeline, numbered by stage. Run from the repository root. Each `.py` drives its matching `.R`. |
+| 2 | [`02_CODE/`](02_CODE/) | The pipeline, numbered by stage. Run from the repository root. Most stages are a `.py` that drives its matching `.R`; Stages 09 and 15 are R-only and run with `Rscript` (see `03_RESULTS/README.md`). |
 | 3 | [`03_RESULTS/`](03_RESULTS/) | Results by scientific question (`01_PCA_BASELINE` … `08_CELL_TYPE_ANNOTATION`), each with a README. |
 | 4 | [`04_PAPER/`](04_PAPER/) | Outline and abstract. |
 | 5 | [`05_REFERENCES/`](05_REFERENCES/) | The original paper, its published figure, and the authors' code. |
@@ -18,8 +18,8 @@ Other folders, which you normally don't need to open:
 
 | where | what |
 | --- | --- |
-| `Age_trajectory/` | The pipeline workspace: data, checkpoints, and the canonical result files that `03_RESULTS/` links to. Generated, git-ignored, about 64 GB. Don't delete anything here without checking. |
-| `ARCHIVE/`, `archive/` | Superseded work. `archive/` has to stay where it is because Stage 05 reads the scGPT gene vocabulary from `archive/vendor/`. |
+| `Age_trajectory/` | The pipeline workspace: data, checkpoints, and the canonical result files that `03_RESULTS/` links to. Generated, git-ignored, about 63 GB. Don't delete anything here without checking. |
+| `ARCHIVE/` | Superseded work: old notebooks and analysis logs. Nothing in the pipeline reads it. |
 
 ## Running
 
