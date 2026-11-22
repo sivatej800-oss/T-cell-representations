@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Stage 17: does cluster structure follow biology or the patient? (scGPT arms)
+"""Stage 17: does cluster structure follow biology or the patient?
 
 Stage 06 measured how strongly each clustering tracks the patient a cell came from. This
 stage measures the other half -- how strongly each clustering tracks cell type -- against
-SingleR labels (Stage 16) that belong to neither arm. It also compares the hand
-annotation of the scGPT-Harmony clusters with SingleR cell by cell, and looks at marker
-genes for the Monocyte/DC cells the two disagree about.
+SingleR labels (Stage 16) that belong to neither arm, for the PCA (15 PCs) and scGPT arms,
+uncorrected and Harmony-corrected. It also compares each Harmony arm's hand annotation
+(Stage 15) with SingleR cell by cell, and looks at marker genes for the Monocyte/DC cells
+the two disagree about. pca_harmony_30dims is deliberately left out.
 
 The Stage 06 clusters were rebuilt after Stage 16's inputs were fixed, so before anything
 is measured this file checks that the rebuilt clusters still describe the same cells and
@@ -20,7 +21,6 @@ import argparse
 import json
 import math
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -41,14 +41,6 @@ TOTAL_CORES = 16
 # Stage 06 is reported, not asserted: Harmony is stochastic enough that a small share of
 # cells moves. What is asserted is that cluster identities survived.
 SCGPT_CLUSTER_COLUMN = "scgpt_harmony"
-
-# The scGPT annotation lives in the main tree's Stage 15 script. It is read from there
-# (read only) because the rebuild may have edited it, and compared with the table the R
-# stage actually used.
-MAIN_TREE_STAGE15 = Path(
-    "/home/amithsiri/projects/Summer-Project-2026/Summer-Project-2026/02_CODE/15_annotate_clusters.R"
-)
-
 
 @dataclass(frozen=True)
 class PipelinePaths:
@@ -75,6 +67,10 @@ class PipelinePaths:
     @property
     def singler(self) -> Path:
         return self.workspace / "results" / "16_singler_labels" / "singler_cell_labels.csv.gz"
+
+    @property
+    def annotation(self) -> Path:
+        return self.workspace / "results" / "15_annotation" / "annotated_cluster_labels.csv.gz"
 
     @property
     def old_clusters(self) -> Path:
@@ -131,6 +127,7 @@ def verify_same_cells(paths: PipelinePaths) -> dict[str, pd.DataFrame]:
             paths.clusters,
             paths.donor_leakage,
             paths.singler,
+            paths.annotation,
             paths.old_clusters,
             paths.old_stage15,
         ]
@@ -147,6 +144,7 @@ def verify_same_cells(paths: PipelinePaths) -> dict[str, pd.DataFrame]:
         "old_clusters": pd.read_csv(paths.old_clusters, dtype=str),
         "old_stage15": pd.read_csv(paths.old_stage15, dtype=str),
         "singler": pd.read_csv(paths.singler, dtype=str),
+        "annotation": pd.read_csv(paths.annotation, dtype=str),
     }
     for name, frame in sources.items():
         if len(frame) != EXPECTED_CELLS or frame["cell_barcode"].duplicated().any():
@@ -204,45 +202,7 @@ def compare_old_and_new_clusters(
     }
 
 
-# --- Step 3: the annotation the R stage used must be the main tree's -----------------
-# The table is typed into the R file. This reads the scGPT block of the main tree's
-# Stage 15 script and confirms the two are the same, so a later edit there cannot leave
-# this stage quietly using a stale copy.
-def parse_stage15_scgpt_annotation(script: Path) -> dict[str, list[str]]:
-    """Read the scgpt_annotation block from the main tree's Stage 15 R script."""
-
-    text = script.read_text(encoding="utf-8")
-    block = re.search(r"scgpt_annotation\s*<-\s*list\((.*?)\n\)", text, flags=re.DOTALL)
-    if block is None:
-        raise ValueError(f"No scgpt_annotation block found in {script}")
-    annotation: dict[str, list[str]] = {}
-    for identity, clusters in re.findall(r'"([^"]+)"\s*=\s*c\(([^)]*)\)', block.group(1)):
-        annotation[identity] = re.findall(r'"([^"]+)"', clusters)
-    return annotation
-
-
-def verify_annotation_matches_main_tree(paths: PipelinePaths) -> dict[str, object]:
-    """Compare the annotation table the R stage wrote with the main tree's Stage 15."""
-
-    require_files([MAIN_TREE_STAGE15, paths.output_dir / "annotation_table_used.csv"])
-    expected = parse_stage15_scgpt_annotation(MAIN_TREE_STAGE15)
-    used_table = pd.read_csv(paths.output_dir / "annotation_table_used.csv", dtype=str)
-    used_table = used_table[used_table["arm"] == "scgpt_harmony"]
-    used = {
-        identity: sorted(group["cluster"], key=int)
-        for identity, group in used_table.groupby("identity")
-    }
-    expected = {identity: sorted(clusters, key=int) for identity, clusters in expected.items()}
-    if used != expected:
-        raise ValueError(
-            "The annotation used by Stage 17 differs from the main tree's Stage 15:\n"
-            f"  Stage 17: {used}\n  Stage 15: {expected}"
-        )
-    print("Annotation table matches the main tree's 15_annotate_clusters.R.")
-    return {"matches_main_tree_stage15": True, "table": used}
-
-
-# --- Step 4: choose how many cores to take ---------------------------------------------
+# --- Step 3: choose how many cores to take ---------------------------------------------
 # The PCA rebuild is still running in the main tree and its load comes in bursts, so the
 # busier of the 1- and 5-minute load averages is used: the 1-minute figure alone can catch
 # a lull. Free cores are the machine's 16 minus the whole cores busy; one more is left
@@ -306,6 +266,7 @@ def run_r(paths: PipelinePaths, workers: int, rscript: str | None = None) -> dic
         str(paths.donor_leakage),
         str(paths.singler),
         str(paths.old_stage15),
+        str(paths.annotation),
         str(paths.output_dir),
         str(workers),
         str(paths.figure_dir),
@@ -316,8 +277,13 @@ def run_r(paths: PipelinePaths, workers: int, rscript: str | None = None) -> dic
     expected = [
         "nmi_by_arm.csv",
         "annotation_vs_singler_agreement.csv",
+        "agreement_per_type_pca_harmony.csv",
         "agreement_per_type_scgpt_harmony.csv",
+        "confusion_pca_harmony.csv",
         "confusion_scgpt_harmony.csv",
+        "confusion_merged_myeloid_pca_harmony.csv",
+        "confusion_merged_myeloid_scgpt_harmony.csv",
+        "myeloid_merge_table.csv",
         "monocyte_dc_marker_groups.csv",
         "confidence_by_broad_label.csv",
         "broad_level_confidence.csv.gz",
@@ -328,8 +294,10 @@ def run_r(paths: PipelinePaths, workers: int, rscript: str | None = None) -> dic
     require_files(
         paths.figure_dir / name
         for name in (
-            "17_nmi_patient_vs_biology.png",
-            "17_agreement_per_celltype_scgpt_harmony.png",
+            "17_patient_vs_biology_scatter.png",
+            "17_agreement_heatmap_pca_harmony.png",
+            "17_agreement_heatmap_scgpt_harmony.png",
+            "17_umap_singler_vs_annotation_pca_harmony.png",
             "17_umap_singler_vs_annotation_scgpt_harmony.png",
         )
     )
@@ -367,7 +335,6 @@ def main() -> None:
     workers, load = choose_workers()
     print(f"Load average {load[0]:.2f} (1 min), {load[1]:.2f} (5 min) -> {workers} SingleR workers.")
     r_audit = run_r(paths, workers, rscript=args.rscript)
-    annotation_check = verify_annotation_matches_main_tree(paths)
 
     audit = {
         "stage": "17_cluster_structure_vs_singler",
@@ -379,11 +346,10 @@ def main() -> None:
             "old_stage06_clusters": str(paths.old_clusters),
             "old_stage15_labels": str(paths.old_stage15),
             "seurat_input": str(paths.seurat_input_dir),
-            "stage15_annotation_source": str(MAIN_TREE_STAGE15),
+            "stage15_annotation": str(paths.annotation),
         },
         "same_cells_in_every_input": EXPECTED_CELLS,
         "old_vs_new_stage06": cluster_checks,
-        "annotation_vs_main_tree": annotation_check,
         "workers": workers,
         "load_average_at_launch": {"1min": load[0], "5min": load[1]},
         "r_packages": versions,
