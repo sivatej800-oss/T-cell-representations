@@ -21,6 +21,8 @@
 # log-normalized once. Nothing is rounded, cast or filtered.
 
 suppressPackageStartupMessages({
+  library(ggplot2)
+  library(patchwork)
   library(Seurat)
   library(Matrix)
   library(SingleR)
@@ -29,9 +31,9 @@ suppressPackageStartupMessages({
 })
 
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) != 7) {
+if (length(args) != 8) {
   stop("Usage: 17_cluster_structure_vs_singler.R <seurat_input_dir> <cluster_csv> ",
-       "<donor_leakage_csv> <singler_csv> <old_stage15_csv> <output_dir> <workers>")
+       "<donor_leakage_csv> <singler_csv> <old_stage15_csv> <output_dir> <workers> <figure_dir>")
 }
 input_dir <- args[1]
 cluster_csv <- args[2]
@@ -40,6 +42,7 @@ singler_csv <- args[4]
 old_stage15_csv <- args[5]
 output_dir <- args[6]
 n_workers <- as.integer(args[7])
+figure_dir <- args[8]
 
 expected_cells <- 70391
 expected_genes <- 19689
@@ -431,4 +434,96 @@ audit <- list(
 )
 writeLines(jsonlite::toJSON(audit, auto_unbox = TRUE, pretty = TRUE, digits = 12, na = "null"),
            file.path(output_dir, "stage17_audit_r.json"))
+
+# --- Step 9: figures ----------------------------------------------------------------------
+# Three plain figures for the scGPT results, written to the tracked figures folder. Cell
+# types keep one colour across all of them.
+dir.create(figure_dir, showWarnings = FALSE, recursive = TRUE)
+
+# Stage 15's palette (the authors' Figure 1D colours), copied here so this stage stands
+# alone. "unassigned" and "Progenitors" have no Stage 15 colour; they get gray and
+# firebrick, which collide with nothing else here.
+CELLTYPE_COLOURS <- c(
+  "T Cells"      = "darkturquoise",
+  "NK Cells"     = "lightpink",
+  "DC"           = "hotpink",
+  "Monocytes"    = "gold1",
+  "B Cells"      = "darkorange",
+  "Plasma Cells" = "darkviolet",
+  "Progenitors"  = "firebrick",
+  "unassigned"   = "gray"
+)
+stopifnot(all(singler$broad_label %in% names(CELLTYPE_COLOURS)))
+
+# Figure 1. Patient vs biology NMI, one group per arm in the order of the arm list, so a
+# new arm adds its group with no other change.
+nmi_long <- rbind(
+  data.frame(arm = nmi_table$arm, measure = "Patient", nmi = nmi_table$patient_nmi),
+  data.frame(arm = nmi_table$arm, measure = "Cell type (SingleR)", nmi = nmi_table$biology_nmi)
+)
+nmi_long$arm <- factor(nmi_long$arm, levels = vapply(arms, function(a) a$name, character(1)))
+nmi_long$measure <- factor(nmi_long$measure, levels = c("Patient", "Cell type (SingleR)"))
+figure_nmi <- ggplot(nmi_long, aes(x = arm, y = nmi, fill = measure)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  geom_text(aes(label = sprintf("%.3f", nmi)), position = position_dodge(width = 0.8),
+            vjust = -0.4, size = 3.5) +
+  scale_fill_manual(values = c("Patient" = "gray55", "Cell type (SingleR)" = "steelblue4")) +
+  scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
+  labs(x = NULL, y = "Normalized mutual information with clusters", fill = NULL) +
+  theme_classic(base_size = 12)
+ggsave(file.path(figure_dir, "17_nmi_patient_vs_biology.png"), figure_nmi,
+       width = 6, height = 5, dpi = 150)
+
+# Figures 2 and 3 are for the scGPT-Harmony arm, the one with a hand annotation.
+figure_arm <- "scgpt_harmony"
+mine_identity <- identity_by_arm[[figure_arm]]
+
+# Figure 2. Agreement with SingleR per annotated cell type, read back from the table the
+# run wrote, with the number of cells behind each bar.
+per_type_table <- utils::read.csv(
+  file.path(output_dir, paste0("agreement_per_type_", figure_arm, ".csv")),
+  stringsAsFactors = FALSE)
+per_type_table$my_identity <- factor(
+  per_type_table$my_identity,
+  levels = intersect(names(CELLTYPE_COLOURS), per_type_table$my_identity))
+figure_agreement <- ggplot(per_type_table, aes(x = my_identity, y = pct_agree, fill = my_identity)) +
+  geom_col(width = 0.7) +
+  geom_text(aes(label = format(n_cells, big.mark = ",")), vjust = 1.5, size = 3.5) +
+  scale_fill_manual(values = CELLTYPE_COLOURS, guide = "none") +
+  scale_y_continuous(limits = c(0, 100), expand = c(0, 0)) +
+  labs(x = "Annotated cell type (cells on bar)", y = "Agreement with SingleR (%)") +
+  theme_classic(base_size = 12)
+ggsave(file.path(figure_dir, "17_agreement_per_celltype_scgpt_harmony.png"), figure_agreement,
+       width = 6.5, height = 5, dpi = 150)
+
+# Figure 3. The same UMAP twice, coloured by SingleR and by the hand annotation. Cells are
+# drawn commonest type first so rare types are not buried. The legend is shared, so a
+# type that appears in only one panel still has a colour; only the SingleR panel, which has
+# every type, carries the legend.
+umap <- data.frame(
+  x = as.numeric(clusters[[paste0(figure_arm, "_UMAP_1")]]),
+  y = as.numeric(clusters[[paste0(figure_arm, "_UMAP_2")]]),
+  singler = singler$broad_label,
+  annotation = mine_identity,
+  stringsAsFactors = FALSE
+)
+if (anyNA(umap$x) || anyNA(umap$y)) stop("A cell has no UMAP coordinates")
+shown_types <- names(CELLTYPE_COLOURS)[names(CELLTYPE_COLOURS) %in% c(umap$singler, umap$annotation)]
+umap_panel <- function(column, label, legend = TRUE) {
+  frequency <- table(umap[[column]])
+  drawn <- umap[order(-as.integer(frequency[umap[[column]]])), ]
+  ggplot(drawn, aes(x = x, y = y, colour = .data[[column]])) +
+    geom_point(size = 0.15, stroke = 0) +
+    scale_colour_manual(values = CELLTYPE_COLOURS, limits = shown_types, name = NULL) +
+    guides(colour = guide_legend(override.aes = list(size = 3))) +
+    coord_cartesian(xlim = range(umap$x), ylim = range(umap$y)) +
+    labs(x = "UMAP 1", y = "UMAP 2", title = label) +
+    theme_classic(base_size = 12) +
+    theme(legend.position = if (legend) "right" else "none")
+}
+# The SingleR panel holds every type, so its legend serves both panels.
+figure_umap <- umap_panel("singler", "SingleR") | umap_panel("annotation", "Annotation", legend = FALSE)
+ggsave(file.path(figure_dir, "17_umap_singler_vs_annotation_scgpt_harmony.png"), figure_umap,
+       width = 12, height = 5.5, dpi = 150)
+
 message("\nStage 17 (R) complete.")

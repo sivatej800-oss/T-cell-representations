@@ -91,6 +91,10 @@ class PipelinePaths:
         )
 
     @property
+    def figure_dir(self) -> Path:
+        return self.workspace / "results" / "figures"
+
+    @property
     def output_dir(self) -> Path:
         return self.workspace / "results" / "17_biology_vs_donor"
 
@@ -304,6 +308,7 @@ def run_r(paths: PipelinePaths, workers: int, rscript: str | None = None) -> dic
         str(paths.old_stage15),
         str(paths.output_dir),
         str(workers),
+        str(paths.figure_dir),
     ]
     print("\nStarting R:\n  " + " ".join(command) + "\n")
     subprocess.run(command, check=True)
@@ -320,6 +325,14 @@ def run_r(paths: PipelinePaths, workers: int, rscript: str | None = None) -> dic
         "stage17_audit_r.json",
     ]
     require_files(paths.output_dir / name for name in expected)
+    require_files(
+        paths.figure_dir / name
+        for name in (
+            "17_nmi_patient_vs_biology.png",
+            "17_agreement_per_celltype_scgpt_harmony.png",
+            "17_umap_singler_vs_annotation_scgpt_harmony.png",
+        )
+    )
     return json.loads((paths.output_dir / "stage17_audit_r.json").read_text(encoding="utf-8"))
 
 
