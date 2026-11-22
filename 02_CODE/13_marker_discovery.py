@@ -2,7 +2,7 @@
 """Stage 13: ask the RNA what the two frozen partitions are.
 
 Stage 12 froze two partitions of the same 70,391 cells -- one from Harmony-corrected
-PCA at 30 dimensions, one from the Harmony-corrected scGPT embedding. Everything up to
+PCA at 15 dimensions, one from the Harmony-corrected scGPT embedding. Everything up to
 here compared them geometrically: silhouette, WCSS, donor mixing. None of it says
 whether either partition's communities are cell types.
 
@@ -45,7 +45,7 @@ import pandas as pd
 REQUIRED_R_PACKAGES = ("Seurat", "Matrix", "jsonlite", "presto")
 
 # The frozen label columns, named as Stage 12 named them.
-PARTITIONS = ("pca30_harmony_cluster", "scgpt_harmony_cluster")
+PARTITIONS = ("pca15_harmony_cluster", "scgpt_harmony_cluster")
 
 EXPECTED_CELLS = 70391
 EXPECTED_GENES = 19689

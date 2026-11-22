@@ -53,7 +53,7 @@ expected_cells <- 70391
 expected_genes <- 19689
 
 # The two frozen label columns, named as Stage 12 named them.
-partitions <- c("pca30_harmony_cluster", "scgpt_harmony_cluster")
+partitions <- c("pca15_harmony_cluster", "scgpt_harmony_cluster")
 
 # The panel the paper used to name its populations, in the paper's order.
 marker_panel <- c(

@@ -16,10 +16,10 @@ they are dangling until it has.
 | --- | --- | --- | --- |
 | [01_PCA_BASELINE](01_PCA_BASELINE/) | Does the Figure 1D clustering workflow reproduce from the public data? | 01–03 | `03_seurat_reproduction` |
 | [02_SCGPT_BASELINE](02_SCGPT_BASELINE/) | What does the same workflow give on a frozen scGPT embedding? | 04–05 | `04_scgpt_embedding` |
-| [03_BATCH_CORRECTION](03_BATCH_CORRECTION/) | With Harmony applied to both, which leaks less patient identity? | 06, 09 | `06_harmony_benchmark` |
+| [03_BATCH_CORRECTION](03_BATCH_CORRECTION/) | With Harmony applied to both, how much patient identity does each leak? | 06, 09 | `06_harmony_benchmark` |
 | [04_SILHOUETTE](04_SILHOUETTE/) | Which partition is more compact and separated, at native widths? | 07 | `07_silhouette` |
 | [05_ELBOW_WCSS](05_ELBOW_WCSS/) | Where does resolution 0.3 sit on each compactness curve? *(supporting)* | 08 | `08_wcss_sweep` |
-| [06_DIMENSION_CONTROL](06_DIMENSION_CONTROL/) | Is scGPT's advantage just its 512 dimensions? | 10–11 | `06_harmony_benchmark`, `11_silhouette_matched` |
+| [06_DIMENSION_CONTROL](06_DIMENSION_CONTROL/) | Does the PCA-vs-scGPT silhouette pattern hold at 512 dimensions? | 10–11 | `06_harmony_benchmark`, `11_silhouette_matched` |
 | [07_CELL_TYPE_MARKERS](07_CELL_TYPE_MARKERS/) | What does the RNA say each frozen cluster is? | 12–14 | `12_frozen_labels`, `13_marker_discovery`, `14_marker_evidence` |
 | [08_CELL_TYPE_ANNOTATION](08_CELL_TYPE_ANNOTATION/) | Which broad cell type is each cluster, in each arm? | 15 | `15_annotation` |
 | [09_T_CELL_SUBCLUSTERS](09_T_CELL_SUBCLUSTERS/) | **PLANNED / NOT YET COMPLETED** — CD4, CD8, Treg by reclustering | — | — |

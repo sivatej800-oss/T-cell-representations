@@ -41,16 +41,16 @@ figure_dir <- args[6]
 expected_cells <- 70391
 expected_genes <- 19689
 
-partitions <- c("pca30_harmony_cluster", "scgpt_harmony_cluster")
+partitions <- c("pca15_harmony_cluster", "scgpt_harmony_cluster")
 partition_labels <- c(
-  pca30_harmony_cluster = "PCA-30 Harmony",
+  pca15_harmony_cluster = "PCA-15 Harmony",
   scgpt_harmony_cluster = "scGPT Harmony"
 )
 # Which Stage 06 UMAP belongs to which partition. Each arm is drawn in its own layout,
 # because a partition plotted over the other arm's coordinates would look incoherent
 # for reasons that have nothing to do with the biology.
 umap_prefix <- c(
-  pca30_harmony_cluster = "pca_harmony",
+  pca15_harmony_cluster = "pca_harmony",
   scgpt_harmony_cluster = "scgpt_harmony"
 )
 

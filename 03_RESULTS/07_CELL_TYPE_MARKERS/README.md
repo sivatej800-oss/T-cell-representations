@@ -5,7 +5,7 @@ RNA say each cluster is?
 
 **Design.** The labels go in, and the RNA provides the evidence:
 - **Freeze the labels (Stage 12).** The two partitions under test are
-  `pca30_harmony_cluster` (13 clusters) and `scgpt_harmony_cluster` (11). They are
+  `pca15_harmony_cluster` (12 clusters) and `scgpt_harmony_cluster` (11). They are
   frozen and checksummed, and are never re-clustered after this point.
 - **Find markers (Stage 13).** One shared RNA object is normalized once.
   `FindAllMarkers` then runs twice on it with identical parameters (the authors'
@@ -28,7 +28,7 @@ and the genes that drop out are the rare-population markers.
 | linked file | what it is |
 | --- | --- |
 | `frozen_cluster_labels.csv.gz` | Both frozen partitions, per cell. |
-| `markers_pca30_harmony_cluster.csv.gz` | FindAllMarkers output, PCA-30 partition. |
+| `markers_pca15_harmony_cluster.csv.gz` | FindAllMarkers output, PCA-15 partition. |
 | `markers_scgpt_harmony_cluster.csv.gz` | The same, scGPT partition. |
 | `cluster_evidence_table.csv` | One row per cluster: size, donors, top markers, panel genes present. This is what annotation is read from. |
 | `top_markers_*.csv` | Top markers per cluster, each arm. |

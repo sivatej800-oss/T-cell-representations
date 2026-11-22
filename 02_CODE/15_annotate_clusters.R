@@ -64,8 +64,8 @@ IDENTITY_COLOURS <- c(
 # Read off Stage 14's feature plots and panel tables. Each entry is a decision, not a
 # computation; the evidence for each is recorded in annotation_rationale.csv.
 
-# PCA-30 Harmony: 13 clusters
-pca30_annotation <- list(
+# PCA-15 Harmony: 13 clusters
+pca15_annotation <- list(
   "T Cells"      = c("0", "1", "2", "5", "8", "9", "12"),
   "Monocytes"    = c("3", "7"),
   "DC"           = c("4", "10"),
@@ -83,7 +83,7 @@ scgpt_annotation <- list(
 )
 
 annotations <- list(
-  pca30_harmony_cluster = pca30_annotation,
+  pca15_harmony_cluster = pca15_annotation,
   scgpt_harmony_cluster = scgpt_annotation
 )
 
@@ -181,9 +181,9 @@ placeholder <- Matrix::Matrix(0, nrow = 1, ncol = nrow(frozen), sparse = TRUE)
 rownames(placeholder) <- "placeholder"
 colnames(placeholder) <- frozen$cell_barcode
 csf <- CreateSeuratObject(counts = placeholder, assay = "RNA")
-umap_prefix <- c(pca30_harmony_cluster = "pca_harmony",
+umap_prefix <- c(pca15_harmony_cluster = "pca_harmony",
                  scgpt_harmony_cluster = "scgpt_harmony")
-partition_labels <- c(pca30_harmony_cluster = "PCA-30 Harmony",
+partition_labels <- c(pca15_harmony_cluster = "PCA-15 Harmony",
                       scgpt_harmony_cluster = "scGPT Harmony")
 
 for (partition in names(annotations)) {

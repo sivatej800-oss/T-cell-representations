@@ -15,6 +15,11 @@ corrected and uncorrected — so the effect of the correction can be read separa
 from the effect of the description, plus a fifth arm that repeats the corrected PCA
 on 30 dimensions rather than 15 to show whether that cut matters.
 
+The PCA arm is built from SCT residuals, the way the authors' PrepSCTIntegration
+builds them, not from the SCT "data" layer their workflow never uses. Residuals are
+centred within each patient, so the arm without Harmony is "normalized per patient,
+no Harmony", not raw.
+
 Neither Stage 03 nor Stage 04 is modified or re-run. Stage 03's clustering remains
 the paper reproduction; this stage's PCA arm is a different analysis that happens to
 start from the same per-sample normalizations, and its cluster count should not be

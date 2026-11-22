@@ -18,7 +18,7 @@
 # total dispersion that the grouping accounts for.
 #
 # The comparison this supports is narrower than it looks. The two curves are computed
-# in different spaces — 30 principal components against 512 learned dimensions — and
+# in different spaces — 15 principal components against 512 learned dimensions — and
 # squared distances in those spaces are not the same quantity. Dividing by the total
 # spread puts both on a 0 to 1 scale, but it does not make the heights comparable:
 # dispersion in 512 dimensions distributes differently, and a gap between the curves
@@ -72,10 +72,10 @@ if (!identical(reference_assignments$cell_barcode, colnames(object))) {
 # are the Harmony-corrected forms, so patient differences have already been removed
 # from each and the sweep measures structure rather than donor separation.
 representations <- list(
-  pca_harmony_30dims = list(
+  pca_harmony = list(
     reduction = "pca_harmony",
-    dims = 1:30,
-    reference_column = "pca_harmony_30dims"
+    dims = 1:15,
+    reference_column = "pca_harmony"
   ),
   scgpt_harmony = list(
     reduction = "scgpt_harmony",
@@ -251,7 +251,7 @@ compactness_plot <- ggplot(
     title = "Cluster compactness against cluster count",
     subtitle = paste(
       "Lower is more compact. Curves are computed in different spaces",
-      "(30 vs 512 dimensions);\ncompare their shape rather than their height."
+      "(15 vs 512 dimensions);\ncompare their shape rather than their height."
     ),
     colour = NULL
   ) +
@@ -293,7 +293,7 @@ dispersion_plot <- ggplot(
     title = "Fraction of total dispersion explained by the grouping",
     subtitle = paste(
       "Higher is more structure accounted for. Curves are computed in different",
-      "spaces\n(30 vs 512 dimensions); compare their shape rather than their height."
+      "spaces\n(15 vs 512 dimensions); compare their shape rather than their height."
     ),
     colour = NULL
   ) +

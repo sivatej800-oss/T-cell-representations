@@ -1,22 +1,19 @@
 # 04 — Silhouette at native widths
 
 **Question.** Which partition is more compact and better separated, with each arm at
-its native width (PCA-30 against scGPT-512)?
+its native width (PCA-15 against scGPT-512)?
 
 **Result.** Each partition is scored in both spaces, and comparisons only run down a
-column. Comparing across a row is invalid because distances in 30 and 512 dimensions
+column. Comparing across a row is invalid because distances in 15 and 512 dimensions
 are not the same quantity.
 
-| partition | scored in PCA-30 | scored in scGPT-512 |
+| partition | scored in PCA-15 | scored in scGPT-512 |
 | --- | --- | --- |
-| PCA labels (13) | 0.006 | 0.103 |
-| scGPT labels (11) | 0.008 | **0.207** |
+| PCA labels (12) | **0.176** | 0.100 |
+| scGPT labels (11) | 0.151 | **0.220** |
 
-In PCA space the two partitions are indistinguishable. In scGPT space they separate,
-and every partition scores higher there. On its own, this pass cannot tell whether
-the embedding organizes the cells better or whether silhouette just behaves
-differently at 512 dimensions. [06_DIMENSION_CONTROL](../06_DIMENSION_CONTROL/) is
-what settles that.
+Each partition scores highest in its own space, so neither description wins in both.
+That says each favours the clusters it produced, not that either is better defined.
 
 **Code.** [`02_CODE/07_silhouette_comparison.py`](../../02_CODE/07_silhouette_comparison.py) → `.R`.
 

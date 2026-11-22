@@ -3,9 +3,11 @@
 **Question.** Resolution 0.3 was inherited from the authors, not tuned here. Does it
 sit at a sensible place on each representation's compactness curve?
 
-**Result.** For PCA-Harmony (30 dims) it lands on the bend, at 12–13 clusters. For
-scGPT-Harmony (512 dims) it lands *before* the bend, at 11 clusters, while the curve
-is still descending. scGPT keeps improving out to about 16–18 clusters.
+**Result.** Resolution 0.3 gives 12 clusters for PCA-Harmony (15 dims) and 11 for
+scGPT-Harmony (512 dims). Both curves keep descending past that point: PCA from 0.336
+at 12 clusters to 0.278 at 20, scGPT from 0.443 at 11 to 0.382 at 21. By 13 clusters
+PCA has covered 69% of its total drop across the sweep and scGPT 62%. No bend was
+computed; the figure shows the shape.
 
 **Read the shapes, not the heights.** The two curves live in spaces of different
 dimensionality. The PCA curve sitting lower is not evidence that PCA clusters better.

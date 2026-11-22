@@ -17,6 +17,17 @@ preserved values exactly, and compares one known patient's metadata against
 hand-verified values. A mistake in single-cell data rarely crashes anything — it
 produces a plausible-looking, wrong figure. That is the failure mode worth guarding.
 
+**Replicate the authors' steps wherever possible.** Every processing choice should
+match the authors' workflow (`05_REFERENCES/author_code/figure1d_author_workflow.R`)
+unless the new analysis — the PCA-vs-scGPT comparison and what follows from it —
+cannot be done that way. A departure is justified only by that need, never by
+preference or convention, and each one is stated in the code and the walkthrough
+with its reason. When adding or changing a step, check what the authors did first.
+For example, Stage 06 built the PCA arm from the SCT `data` layer, which the
+authors' workflow never uses, and the whole arm came out dominated by depth and gene
+count; it was rebuilt from SCT residuals, which is what their integration
+consumes.
+
 Comments explain the data and the science, never Python or R syntax. The `.py` files
 are organized as notebook-style blocks with a purpose header above each step.
 
@@ -67,6 +78,17 @@ features, resolution 0.3, and `dims = 1:15`, all unchanged.
 state preceded them. Because the script resumes from checkpoints, that state depends
 on how much of the run was recomputed. The `set.seed` calls before those steps are
 what make a resumed run and a fresh run agree; they are not redundant.
+
+**Stage 06 builds the PCA arm from SCT residuals, not the `data` layer.** The authors'
+integration consumes the Pearson residuals `PrepSCTIntegration` builds (stored
+`scale.data` for each sample's 1,000 variable genes, model-derived residuals for the
+rest), and never touches the log-scale `data` layer. A PCA on `data` came out dominated
+by sequencing depth and gene count, not cell type. Stage 06 now stacks those residuals
+into `scale.data` and runs `RunPCA` directly, with no `ScaleData` call; Stage 10 reads
+the same checkpoint. The main PCA arm is `pca_harmony` on 15 PCs, as the authors used.
+The uncorrected arm is "normalized per patient, no Harmony", not raw: residuals are
+centred within each patient, so it is partly donor-adjusted. `percent.mt` is reduced
+in this arm, not removed.
 
 **The stages repeat their path and validation helpers on purpose.** The pipeline has
 15 stages and they import nothing from each other, so each file can be read and run on

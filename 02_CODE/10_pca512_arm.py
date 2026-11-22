@@ -1,6 +1,6 @@
 """Build a PCA arm at the embedding's dimensionality, to control the comparison.
 
-Stage 07 scored a 13-cluster PCA partition in 30 dimensions against an 11-cluster
+Stage 07 scored a 12-cluster PCA partition in 15 dimensions against an 11-cluster
 scGPT partition in 512, and found every partition scores higher in scGPT
 coordinates than in PCA coordinates. Two explanations fit that: the embedding
 organizes the cells more cleanly, or silhouette simply behaves differently in 512
@@ -9,8 +9,8 @@ distances, so dimensionality moves the score by itself.
 
 This stage builds the control that separates them — PCA carried to 512 components,
 Harmony-corrected, and clustered fresh at Stage 06's settings. The clustering is
-new rather than the 30-dimension labels re-scored, because the comparison needs a
-PCA-512 partition, not the PCA-30 partition viewed from further away.
+new rather than the 15-dimension labels re-scored, because the comparison needs a
+PCA-512 partition, not the PCA-15 partition viewed from further away.
 
 The heavy work is in 10_pca512_arm.R; this file checks the inputs, records the
 environment, and reports what the arm produced.
