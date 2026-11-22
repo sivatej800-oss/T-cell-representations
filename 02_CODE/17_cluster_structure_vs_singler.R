@@ -79,6 +79,16 @@ arms <- list(
   )
 )
 
+# Readable names for the figures. Every arm above needs an entry; add PCA arms here the
+# same way.
+arm_labels <- c(
+  scgpt_raw     = "scGPT raw",
+  scgpt_harmony = "scGPT + Harmony"
+)
+if (!all(vapply(arms, function(a) a$name, character(1)) %in% names(arm_labels))) {
+  stop("Every arm needs a readable label in arm_labels")
+}
+
 # Marker genes for telling monocytes from dendritic cells: classical/non-classical
 # monocyte (CD14, VCAN, S100A8, FCGR3A), cDC2 and general DC (FCER1A, CD1C, CLEC10A),
 # plasmacytoid DC (LILRA4).
@@ -461,7 +471,8 @@ nmi_long <- rbind(
   data.frame(arm = nmi_table$arm, measure = "Patient", nmi = nmi_table$patient_nmi),
   data.frame(arm = nmi_table$arm, measure = "Cell type (SingleR)", nmi = nmi_table$biology_nmi)
 )
-nmi_long$arm <- factor(nmi_long$arm, levels = vapply(arms, function(a) a$name, character(1)))
+arm_order <- vapply(arms, function(a) a$name, character(1))
+nmi_long$arm <- factor(nmi_long$arm, levels = arm_order, labels = unname(arm_labels[arm_order]))
 nmi_long$measure <- factor(nmi_long$measure, levels = c("Patient", "Cell type (SingleR)"))
 figure_nmi <- ggplot(nmi_long, aes(x = arm, y = nmi, fill = measure)) +
   geom_col(position = position_dodge(width = 0.8), width = 0.7) +
@@ -478,28 +489,55 @@ ggsave(file.path(figure_dir, "17_nmi_patient_vs_biology.png"), figure_nmi,
 figure_arm <- "scgpt_harmony"
 mine_identity <- identity_by_arm[[figure_arm]]
 
-# Figure 2. Agreement with SingleR per annotated cell type, read back from the table the
-# run wrote, with the number of cells behind each bar.
+# Figure 2. What SingleR calls the cells of each annotated type: one 100% bar per type,
+# segments are SingleR's labels, read back from the confusion table the run wrote. The
+# agreeing segment sits at the bottom of each bar and its percentage is printed above. The
+# cell count goes under the type name rather than on the bar.
+confusion <- utils::read.csv(file.path(output_dir, paste0("confusion_", figure_arm, ".csv")),
+                             stringsAsFactors = FALSE)
 per_type_table <- utils::read.csv(
   file.path(output_dir, paste0("agreement_per_type_", figure_arm, ".csv")),
   stringsAsFactors = FALSE)
-per_type_table$my_identity <- factor(
-  per_type_table$my_identity,
-  levels = intersect(names(CELLTYPE_COLOURS), per_type_table$my_identity))
-figure_agreement <- ggplot(per_type_table, aes(x = my_identity, y = pct_agree, fill = my_identity)) +
-  geom_col(width = 0.7) +
-  geom_text(aes(label = format(n_cells, big.mark = ",")), vjust = 1.5, size = 3.5) +
-  scale_fill_manual(values = CELLTYPE_COLOURS, guide = "none") +
-  scale_y_continuous(limits = c(0, 100), expand = c(0, 0)) +
-  labs(x = "Annotated cell type (cells on bar)", y = "Agreement with SingleR (%)") +
+type_order <- intersect(names(CELLTYPE_COLOURS), per_type_table$my_identity)
+per_type_table <- per_type_table[match(type_order, per_type_table$my_identity), ]
+per_type_table$x <- seq_along(type_order)
+per_type_table$axis_label <- paste0(per_type_table$my_identity, "\nn = ",
+                                    prettyNum(per_type_table$n_cells, big.mark = ","))
+
+# Stack each bar by hand: the agreeing segment first, then the rest by size.
+segments <- do.call(rbind, lapply(type_order, function(type) {
+  rows <- confusion[confusion$my_identity == type, ]
+  rows <- rows[order(rows$singler_broad_label != type, -rows$n_cells), ]
+  rows$ymax <- cumsum(rows$row_pct)
+  rows$ymin <- rows$ymax - rows$row_pct
+  rows$x <- match(type, type_order)
+  rows
+}))
+if (any(abs(tapply(segments$row_pct, segments$my_identity, sum) - 100) > 1e-9)) {
+  stop("A stacked bar does not sum to 100%")
+}
+segments$singler_broad_label <- factor(segments$singler_broad_label,
+                                       levels = names(CELLTYPE_COLOURS))
+figure_agreement <- ggplot() +
+  geom_rect(data = segments,
+            aes(xmin = x - 0.35, xmax = x + 0.35, ymin = ymin, ymax = ymax,
+                fill = singler_broad_label)) +
+  geom_text(data = per_type_table, aes(x = x, y = 102, label = sprintf("%.1f%%", pct_agree)),
+            vjust = 0, size = 4) +
+  scale_fill_manual(values = CELLTYPE_COLOURS, name = "SingleR label", drop = TRUE) +
+  scale_x_continuous(breaks = per_type_table$x, labels = per_type_table$axis_label,
+                     expand = c(0.05, 0.05)) +
+  scale_y_continuous(breaks = seq(0, 100, 25), expand = c(0, 0)) +
+  coord_cartesian(ylim = c(0, 110)) +
+  labs(x = "Annotated cell type", y = "Cells of that type, by SingleR label (%)") +
   theme_classic(base_size = 12)
 ggsave(file.path(figure_dir, "17_agreement_per_celltype_scgpt_harmony.png"), figure_agreement,
-       width = 6.5, height = 5, dpi = 150)
+       width = 7.5, height = 5.5, dpi = 150)
 
-# Figure 3. The same UMAP twice, coloured by SingleR and by the hand annotation. Cells are
-# drawn commonest type first so rare types are not buried. The legend is shared, so a
-# type that appears in only one panel still has a colour; only the SingleR panel, which has
-# every type, carries the legend.
+# Figure 3. The same UMAP three times with identical axes: coloured by SingleR, coloured by
+# the hand annotation, and the cells where the two disagree. Cells are drawn in a seeded
+# shuffled order so no type systematically sits on top of another. Only the SingleR panel,
+# which holds every type, carries the legend.
 umap <- data.frame(
   x = as.numeric(clusters[[paste0(figure_arm, "_UMAP_1")]]),
   y = as.numeric(clusters[[paste0(figure_arm, "_UMAP_2")]]),
@@ -508,22 +546,40 @@ umap <- data.frame(
   stringsAsFactors = FALSE
 )
 if (anyNA(umap$x) || anyNA(umap$y)) stop("A cell has no UMAP coordinates")
-shown_types <- names(CELLTYPE_COLOURS)[names(CELLTYPE_COLOURS) %in% c(umap$singler, umap$annotation)]
-umap_panel <- function(column, label, legend = TRUE) {
-  frequency <- table(umap[[column]])
-  drawn <- umap[order(-as.integer(frequency[umap[[column]]])), ]
-  ggplot(drawn, aes(x = x, y = y, colour = .data[[column]])) +
-    geom_point(size = 0.15, stroke = 0) +
-    scale_colour_manual(values = CELLTYPE_COLOURS, limits = shown_types, name = NULL) +
-    guides(colour = guide_legend(override.aes = list(size = 3))) +
-    coord_cartesian(xlim = range(umap$x), ylim = range(umap$y)) +
-    labs(x = "UMAP 1", y = "UMAP 2", title = label) +
-    theme_classic(base_size = 12) +
-    theme(legend.position = if (legend) "right" else "none")
+umap$disagree <- assigned & umap$annotation != umap$singler
+agreement_row <- utils::read.csv(file.path(output_dir, "annotation_vs_singler_agreement.csv"))
+agreement_row <- agreement_row[agreement_row$arm == figure_arm, ]
+if (sum(umap$disagree) != agreement_row$n_cells_scored - agreement_row$n_agree) {
+  stop("The disagreement count does not match the agreement table")
 }
-# The SingleR panel holds every type, so its legend serves both panels.
-figure_umap <- umap_panel("singler", "SingleR") | umap_panel("annotation", "Annotation", legend = FALSE)
+set.seed(42)
+umap <- umap[sample(nrow(umap)), ]
+
+shown_types <- names(CELLTYPE_COLOURS)[names(CELLTYPE_COLOURS) %in% c(umap$singler, umap$annotation)]
+axis_limits <- list(x = range(umap$x), y = range(umap$y))
+umap_theme <- list(
+  coord_cartesian(xlim = axis_limits$x, ylim = axis_limits$y),
+  labs(x = "UMAP 1", y = "UMAP 2"),
+  theme_classic(base_size = 12)
+)
+umap_panel <- function(column, label, legend) {
+  ggplot(umap, aes(x = x, y = y, colour = .data[[column]])) +
+    geom_point(size = 0.3, stroke = 0) +
+    scale_colour_manual(values = CELLTYPE_COLOURS, limits = shown_types, name = NULL,
+                        guide = if (legend) guide_legend(override.aes = list(size = 5)) else "none") +
+    ggtitle(label) + umap_theme +
+    theme(legend.key.size = unit(0.7, "cm"), legend.text = element_text(size = 12))
+}
+panel_disagree <- ggplot(umap, aes(x = x, y = y)) +
+  geom_point(colour = "gray90", size = 0.3, stroke = 0) +
+  geom_point(data = umap[umap$disagree, ], colour = "blue3", size = 0.3, stroke = 0) +
+  ggtitle(sprintf("Disagree (n = %s)", format(sum(umap$disagree), big.mark = ","))) +
+  umap_theme
+figure_umap <- (umap_panel("singler", "SingleR", TRUE) |
+                  umap_panel("annotation", "Annotation", FALSE) |
+                  panel_disagree) +
+  plot_layout(guides = "collect")
 ggsave(file.path(figure_dir, "17_umap_singler_vs_annotation_scgpt_harmony.png"), figure_umap,
-       width = 12, height = 5.5, dpi = 150)
+       width = 17, height = 5.5, dpi = 150)
 
 message("\nStage 17 (R) complete.")
