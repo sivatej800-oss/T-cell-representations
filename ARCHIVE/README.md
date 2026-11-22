@@ -10,7 +10,6 @@ pipeline, and it is not a way to reproduce the result — start with the top-lev
 | `edited_good_reproduction.md` | A markdown export of the R notebook reproduction that came before the scripted pipeline. |
 | `notebooks/` | The original numbered notebook pipeline and a failed experimental attempt. Superseded by the numbered scripts under `02_CODE/`; see its own README. |
 | `legacy_data_directory/` | The README from the former empty root-level `data/` directory. Obsolete; generated data now belongs in `Age_trajectory/` or a selected `--workspace`. |
-| `vendor/` | Upstream scGPT source snapshot. Not imported or executed. (Removed in the next commit, which keeps only the gene vocabulary under `05_REFERENCES/scgpt_vocab/`.) |
 | `../Age_trajectory/archive/legacy_notebook_outputs/` | 25 GB of outputs from the superseded notebook workflow. Nothing reads it, and it is kept until you decide to delete it. |
 
 The authors' Figure 1D R workflow is not archived: it lives in

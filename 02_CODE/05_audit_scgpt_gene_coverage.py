@@ -40,11 +40,11 @@ import numpy as np
 
 # --- The vocabulary this run used --------------------------------------------
 # The model directory's own vocab.json is not in this repository; it lived with the
-# GPU run. The vocabulary vendored under ARCHIVE/ is not byte-identical to it — the
+# GPU run. The vocabulary kept in 05_REFERENCES/scgpt_vocab/ is not byte-identical to it — the
 # model file prepends special tokens, so the checksums differ — but its gene content
 # is what matters, and that is checkable: its 60,694 tokens reproduce the run's
 # recorded 15,960 / 3,729 split exactly. A different vocabulary would not.
-VENDORED_VOCABULARY = Path("ARCHIVE/vendor/scGPT-main/scgpt/tokenizer/default_census_vocab.json")
+VENDORED_VOCABULARY = Path("05_REFERENCES/scgpt_vocab/default_census_vocab.json")
 
 # Symbols with no stable name. These are largely absent from curated references, so
 # their absence from the vocabulary costs little, and separating them from ordinary

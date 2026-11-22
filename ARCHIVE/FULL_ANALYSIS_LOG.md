@@ -281,7 +281,7 @@ The raw gene count overstates the loss by a factor of sixteen:
 
 **What it does not settle.** The loss is concentrated in histones and tRNA synthetases — proliferation and translational-capacity signal. If a cluster turns out to be defined by cell-cycle state, the scGPT arm saw a weakened version of that axis.
 
-`02_CODE/05_audit_scgpt_gene_coverage.py` produces the full report in `scgpt_gene_coverage_audit.json`. It refuses to run if the vendored vocabulary at `ARCHIVE/vendor/scGPT-main/scgpt/tokenizer/default_census_vocab.json` does not reproduce the run's recorded matched-gene count, so a mismatched vocabulary fails loudly rather than producing a plausible wrong answer.
+`02_CODE/05_audit_scgpt_gene_coverage.py` produces the full report in `scgpt_gene_coverage_audit.json`. It refuses to run if the vendored vocabulary at `05_REFERENCES/scgpt_vocab/default_census_vocab.json` does not reproduce the run's recorded matched-gene count, so a mismatched vocabulary fails loudly rather than producing a plausible wrong answer.
 
 ## Stage 06 — making the two arms comparable
 
