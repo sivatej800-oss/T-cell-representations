@@ -80,10 +80,7 @@ at subtype resolution.
 - PCA extended to 512 components by exact SVD, Harmony-corrected, and clustered
   fresh. Silhouette recomputed in a 512-vs-512 design (25,000 cells per draw).
 
-### 3.6 Resolution sweep (supplementary)
-- Louvain resolution 0.1–1.0; normalized WCSS against cluster count.
-
-### 3.7 Biological validation
+### 3.6 Biological validation
 - Partitions frozen and checksummed before any biological assessment.
 - One LogNormalized RNA matrix shared by both arms. RNA rather than SCT because
   per-sample SCT shares only 9,013 genes.
@@ -91,7 +88,7 @@ at subtype resolution.
 - The authors' 14-gene canonical panel; manual annotation into the authors'
   seven categories.
 
-### 3.8 Subclustering — PENDING
+### 3.7 Subclustering — PENDING
 - T cells and monocytes subset and reclustered within each arm, following the
   authors' step 8, then annotated: CD4, CD8, CD4/CD8, Treg; classical,
   intermediate, non-classical monocytes.
@@ -227,8 +224,6 @@ Links point to the canonical files in `Age_trajectory/results/figures/` (they op
 | **3D** | Broad cell types, scGPT-Harmony | [15_celltypes_scgpt_harmony_cluster.png](../Age_trajectory/results/figures/15_celltypes_scgpt_harmony_cluster.png) |
 | **S1** | scGPT uncorrected UMAP (13 clusters) | [04_scgpt_raw_umap_clusters.png](../Age_trajectory/results/figures/04_scgpt_raw_umap_clusters.png) |
 | **S2A** | Uncorrected PCA UMAP (11 clusters) | [06_pca_raw_umap.png](../Age_trajectory/results/figures/06_pca_raw_umap.png) |
-| **S3A** | WCSS against cluster count | [08_wcss_compactness.png](../Age_trajectory/results/figures/08_wcss_compactness.png) |
-| **S3B** | Dispersion explained against cluster count | [08_wcss_dispersion_explained.png](../Age_trajectory/results/figures/08_wcss_dispersion_explained.png) |
 | **S4** | Cluster maps used alongside the marker panels | [14_clusters_scgpt_harmony_cluster.png](../Age_trajectory/results/figures/14_clusters_scgpt_harmony_cluster.png) · [14_clusters_pca15_harmony_cluster.png](../Age_trajectory/results/figures/14_clusters_pca15_harmony_cluster.png) |
 | **4A–B** | T-cell subclusters per arm | PENDING |
 | **4C–D** | Monocyte subclusters per arm | PENDING |
@@ -236,7 +231,7 @@ Links point to the canonical files in `Age_trajectory/results/figures/` (they op
 Main-text figures: **Fig. 1** reproduction and donor correction · **Fig. 2** cluster
 separation and dimensionality control · **Fig. 3** biological validation · **Fig. 4**
 subtypes (pending). Supplementary: S1 scGPT uncorrected · S2 uncorrected PCA ·
-S3 WCSS sweep · S4 cluster maps.
+S4 cluster maps.
 
 ### Supplementary figures
 
@@ -247,14 +242,6 @@ S3 WCSS sweep · S4 cluster maps.
 **Supp. Fig. S2.** Uncorrected PCA, 11 clusters
 
 ![Supp. Fig. S2: Uncorrected PCA, 11 clusters](../Age_trajectory/results/figures/06_pca_raw_umap.png)
-
-**Supp. Fig. S3A.** Normalized WCSS against cluster count
-
-![Supp. Fig. S3A: Normalized WCSS against cluster count](../Age_trajectory/results/figures/08_wcss_compactness.png)
-
-**Supp. Fig. S3B.** Dispersion explained against cluster count
-
-![Supp. Fig. S3B: Dispersion explained against cluster count](../Age_trajectory/results/figures/08_wcss_dispersion_explained.png)
 
 **Supp. Fig. S4A.** PCA-Harmony cluster map
 

@@ -18,10 +18,10 @@ Figure 1D.
 | 2 | Same workflow on a frozen scGPT embedding, plus a gene-coverage audit | [02_SCGPT_BASELINE](../03_RESULTS/02_SCGPT_BASELINE/) |
 | 3 | Harmony on both arms, measuring donor mixing and leakage | [03_BATCH_CORRECTION](../03_RESULTS/03_BATCH_CORRECTION/) |
 | 4 | Silhouette at native widths | [04_SILHOUETTE](../03_RESULTS/04_SILHOUETTE/) |
-| 5 | WCSS elbow sweep *(supporting)* | [05_ELBOW_WCSS](../03_RESULTS/05_ELBOW_WCSS/) |
-| 6 | PCA-512 control and silhouette at matched width | [06_DIMENSION_CONTROL](../03_RESULTS/06_DIMENSION_CONTROL/) |
-| 7 | Frozen labels, marker discovery, marker evidence | [07_CELL_TYPE_MARKERS](../03_RESULTS/07_CELL_TYPE_MARKERS/) |
-| 8 | Broad cell-type annotation, both arms, by hand | [08_CELL_TYPE_ANNOTATION](../03_RESULTS/08_CELL_TYPE_ANNOTATION/) |
+| 5 | PCA-512 control and silhouette at matched width | [05_DIMENSION_CONTROL](../03_RESULTS/05_DIMENSION_CONTROL/) |
+| 6 | Frozen labels, marker discovery, marker evidence | [06_CELL_TYPE_MARKERS](../03_RESULTS/06_CELL_TYPE_MARKERS/) |
+| 7 | Broad cell-type annotation, both arms, by hand | [07_CELL_TYPE_ANNOTATION](../03_RESULTS/07_CELL_TYPE_ANNOTATION/) |
+| 8 | SingleR reference labels: does each arm follow biology or the patient? | [08_BIOLOGY_VS_PATIENT](../03_RESULTS/08_BIOLOGY_VS_PATIENT/) |
 
 ## Headline results
 

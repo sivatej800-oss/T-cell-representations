@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage 12: freeze the two cluster partitions the biological comparison will judge.
+"""Stage 12: freeze the cluster partitions the biological comparison will judge.
 
 Stages 06 through 11 asked which representation draws better-separated groups, and
 answered in the representations' own terms — silhouette, WCSS, donor mixing. None of
@@ -23,6 +23,12 @@ do with cluster 3 in the other; Louvain numbers by descending size, so the numbe
 is an artefact of how many cells happened to fall where. What is frozen is the
 grouping, not the labels' names.
 
+Four partitions are frozen. The main comparison is the authors' published pipeline
+(Stage 03: per-sample SCTransform, anchor integration, 15 PCs) against zero-shot scGPT
+with no correction at all (Stage 06's scgpt_raw). The two Harmony arms were the first
+comparison and stay frozen so that the work built on them can still be re-run; the
+columns they occupied are never changed when partitions are added.
+
 This stage performs no clustering and makes no biological claim. It selects, checks,
 and freezes.
 """
@@ -41,14 +47,27 @@ import pandas as pd
 
 
 # --- What is being frozen ----------------------------------------------------
-# The two arms are named as Stage 06 named them. The PCA arm is the 15-dimension one,
-# the number the authors used, matching Stages 07 and 11. The 30-dimension arm stays
-# in Stage 06 only as a sensitivity check.
+# The Harmony arms are named as Stage 06 named them. The PCA arm is the 15-dimension
+# one, the number the authors used, matching Stages 07 and 11. The 30-dimension arm
+# stays in Stage 06 only as a sensitivity check.
 PCA_ARM = "pca_harmony"
 SCGPT_ARM = "scgpt_harmony"
+# The main comparison. scgpt_raw is Stage 06's, not Stage 04's: both cluster the same
+# embedding with the same settings, but Stage 04's run predates a change of linear
+# algebra library on this machine and its partition differs slightly (ARI 0.98, one
+# 344-cell group split off). Stage 06's is the current run and the one Stage 17 reads.
+SCGPT_RAW_ARM = "scgpt_raw"
 
-# The names the frozen file uses, which are what later stages will refer to.
-FROZEN_NAMES = {PCA_ARM: "pca15_harmony_cluster", SCGPT_ARM: "scgpt_harmony_cluster"}
+# The names the frozen file uses, which are what later stages will refer to. Stage 03's
+# partition is not a Stage 06 arm and is read from Stage 03's own output.
+FROZEN_NAMES = {
+    PCA_ARM: "pca15_harmony_cluster",
+    SCGPT_ARM: "scgpt_harmony_cluster",
+    SCGPT_RAW_ARM: "scgpt_raw_cluster",
+}
+STAGE03_COLUMN = "seurat_cluster"
+STAGE03_NAME = "authors_pipeline_cluster"
+ALL_FROZEN = [*FROZEN_NAMES.values(), STAGE03_NAME]
 
 EXPECTED_CELLS = 70391
 
@@ -66,6 +85,13 @@ class PipelinePaths:
     @property
     def benchmark_dir(self) -> Path:
         return self.workspace / "results" / "06_harmony_benchmark"
+
+    @property
+    def stage03_clusters_file(self) -> Path:
+        return (
+            self.workspace / "results" / "03_seurat_reproduction"
+            / "GSE200164_umap_clusters.csv.gz"
+        )
 
     @property
     def seurat_input_dir(self) -> Path:
@@ -93,24 +119,31 @@ def require_files(paths: Iterable[Path]) -> None:
         raise FileNotFoundError("Missing required inputs:\n  " + "\n  ".join(missing))
 
 
-# --- Step 1: read the two partitions out of Stage 06 -------------------------
-# Stage 06 wrote all five arms into one table. Only two of them are the subject of
-# the biological comparison, and taking exactly those two here is what makes the
-# freeze a decision rather than a copy.
+# --- Step 1: read the partitions out of Stages 03 and 06 ---------------------
+# Stage 06 wrote all five arms into one table and only three are taken; taking exactly
+# those is what makes the freeze a decision rather than a copy. Stage 03's partition
+# is joined by barcode, never by position.
 def load_partitions(paths: PipelinePaths) -> pd.DataFrame:
-    """Take the PCA-15 and scGPT partitions from Stage 06's assignment table."""
+    """Take the frozen partitions from Stage 06's table and Stage 03's output."""
 
     assignments_file = paths.benchmark_dir / "benchmark_cluster_assignments.csv.gz"
-    require_files([assignments_file])
+    require_files([assignments_file, paths.stage03_clusters_file])
 
-    assignments = pd.read_csv(assignments_file, dtype={PCA_ARM: str, SCGPT_ARM: str})
-    for arm in (PCA_ARM, SCGPT_ARM):
+    assignments = pd.read_csv(assignments_file, dtype=str)
+    for arm in FROZEN_NAMES:
         if arm not in assignments.columns:
             raise ValueError(f"Stage 06 output does not contain the arm {arm}")
+    frozen = assignments[["cell_barcode", *FROZEN_NAMES]].rename(columns=FROZEN_NAMES)
 
-    frozen = assignments[["cell_barcode", PCA_ARM, SCGPT_ARM]].rename(
-        columns=FROZEN_NAMES
+    stage03 = pd.read_csv(paths.stage03_clusters_file, dtype=str)
+    stage03 = stage03[["cell_barcode", STAGE03_COLUMN]].rename(
+        columns={STAGE03_COLUMN: STAGE03_NAME}
     )
+    if len(stage03) != len(frozen) or set(stage03["cell_barcode"]) != set(
+        frozen["cell_barcode"]
+    ):
+        raise ValueError("Stage 03 and Stage 06 do not describe the same cells")
+    frozen = frozen.merge(stage03, on="cell_barcode", how="left", validate="one_to_one")
     return frozen
 
 
@@ -133,7 +166,7 @@ def verify_cells_match_rna(frozen: pd.DataFrame, paths: PipelinePaths) -> None:
         )
     if frozen["cell_barcode"].duplicated().any():
         raise ValueError("Stage 06's assignments contain duplicate cell barcodes")
-    if frozen[list(FROZEN_NAMES.values())].isna().any().any():
+    if frozen[ALL_FROZEN].isna().any().any():
         raise ValueError("A cell is missing a cluster label in one of the arms")
     if len(rna_barcodes) != EXPECTED_CELLS:
         raise ValueError(
@@ -157,27 +190,28 @@ def verify_cells_match_rna(frozen: pd.DataFrame, paths: PipelinePaths) -> None:
 
 # --- Step 3: report the partitions being frozen ------------------------------
 # Printed so the freeze is inspectable at the moment it happens. The cross-tabulation
-# is the substance of the comparison to come: it is the same cells partitioned two
-# ways, and where the two disagree is where the marker evidence will have to decide.
+# is the substance of the main comparison: the same cells partitioned two ways, and
+# where the two disagree is where the marker evidence will have to decide.
 def describe_partitions(frozen: pd.DataFrame) -> dict[str, object]:
-    """State each partition's cluster sizes and how far the two disagree."""
+    """State each partition's cluster sizes and how far the main two disagree."""
 
+    sources = {name: f"Stage 06 arm {arm}" for arm, name in FROZEN_NAMES.items()}
+    sources[STAGE03_NAME] = f"Stage 03 {STAGE03_COLUMN}"
     report: dict[str, object] = {}
-    for arm, column in FROZEN_NAMES.items():
+    for column in ALL_FROZEN:
         sizes = frozen[column].value_counts()
         print(
-            f"\n{column} (Stage 06 arm {arm}): {len(sizes)} clusters, "
+            f"\n{column} ({sources[column]}): {len(sizes)} clusters, "
             f"{sizes.min()}-{sizes.max()} cells per cluster"
         )
         report[column] = {
-            "source_arm": arm,
+            "source": sources[column],
             "n_clusters": int(len(sizes)),
             "cluster_sizes": {str(k): int(v) for k, v in sizes.sort_index().items()},
         }
 
-    pca_column, scgpt_column = FROZEN_NAMES[PCA_ARM], FROZEN_NAMES[SCGPT_ARM]
-    overlap = pd.crosstab(frozen[pca_column], frozen[scgpt_column])
-    print("\nCells shared between clusters (rows PCA-15, columns scGPT):")
+    overlap = pd.crosstab(frozen[STAGE03_NAME], frozen[FROZEN_NAMES[SCGPT_RAW_ARM]])
+    print("\nCells shared between clusters (rows authors' pipeline, columns scGPT raw):")
     print(overlap.to_string())
     print(
         "\nCluster numbers are not comparable across arms. Louvain numbers by "
@@ -195,20 +229,34 @@ def describe_partitions(frozen: pd.DataFrame) -> dict[str, object]:
 def write_frozen_labels(frozen: pd.DataFrame, paths: PipelinePaths) -> tuple[Path, str]:
     """Write the frozen labels and return the path and their checksum."""
 
+    # A partition may be added to the freeze, but one already frozen may never change:
+    # every column the existing file holds must come back cell for cell identical.
     frozen_file = paths.frozen_dir / "frozen_cluster_labels.csv.gz"
     if frozen_file.exists():
         existing = pd.read_csv(frozen_file, dtype=str)
-        if not existing.equals(frozen.astype(str)):
+        unknown = set(existing.columns) - set(frozen.columns)
+        changed = [
+            column for column in existing.columns
+            if column in frozen.columns
+            and not existing[column].equals(frozen[column].astype(str))
+        ]
+        if unknown or changed:
             raise RuntimeError(
-                f"{frozen_file} already exists and holds different labels. The "
-                "partitions are frozen; if they genuinely need to change, delete "
-                "this file deliberately and re-run every stage that read it."
+                f"{frozen_file} already exists and holds different labels "
+                f"({sorted(unknown | set(changed))}). The partitions are frozen; if "
+                "they genuinely need to change, delete this file deliberately and "
+                "re-run every stage that read it."
             )
-        print(f"\n{frozen_file.name} already exists and is identical; left in place.")
+        if list(existing.columns) == list(frozen.columns):
+            print(f"\n{frozen_file.name} already exists and is identical; left in place.")
+        else:
+            added = [c for c in frozen.columns if c not in existing.columns]
+            frozen.to_csv(frozen_file, index=False)
+            print(f"\nAdded {added} to {frozen_file.name}; existing columns unchanged.")
     else:
         frozen.to_csv(frozen_file, index=False)
 
-    columns = ["cell_barcode", *FROZEN_NAMES.values()]
+    columns = ["cell_barcode", *ALL_FROZEN]
     payload = frozen[columns].to_csv(index=False).encode("utf-8")
     checksum = hashlib.sha256(payload).hexdigest()
     return frozen_file, checksum
@@ -246,8 +294,11 @@ def main() -> None:
 
     audit = {
         "stage": "12_freeze_cluster_labels",
-        "source": "results/06_harmony_benchmark/benchmark_cluster_assignments.csv.gz",
-        "arms_frozen": FROZEN_NAMES,
+        "sources": [
+            "results/06_harmony_benchmark/benchmark_cluster_assignments.csv.gz",
+            "results/03_seurat_reproduction/GSE200164_umap_clusters.csv.gz",
+        ],
+        "arms_frozen": {**FROZEN_NAMES, STAGE03_COLUMN: STAGE03_NAME},
         "n_cells": int(len(frozen)),
         "label_checksum_sha256": checksum,
         "partitions": report,

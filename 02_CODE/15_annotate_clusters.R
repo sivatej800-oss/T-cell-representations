@@ -2,8 +2,10 @@
 #
 # The authors did not compute their annotation. They plotted each canonical marker
 # over the UMAP, looked at the result, and typed cluster numbers into a block of
-# assignments (their lines 181-202). This stage is that block, written twice -- once
-# per partition -- and nothing more.
+# assignments (their lines 181-202). This stage is that block, written once per
+# partition, and nothing more. The main comparison is the authors' pipeline against
+# uncorrected scGPT; the two Harmony blocks are the earlier comparison, kept as they
+# were so its outputs can still be reproduced.
 #
 # It is deliberately not a rule engine. An earlier version of this stage inferred
 # identities from marker thresholds and invented finer categories than the panel can
@@ -91,7 +93,47 @@ scgpt_annotation <- list(
   "Undetermined" = c("7")
 )
 
+# Authors' pipeline (Stage 03): 12 clusters, read from Stage 14's evidence for this
+# partition alone, without SingleR, which Stage 17 scores the annotation against.
+# - Cluster 3 (APOE, C1Q genes, LYVE1; CD14 and CD68 high) is macrophage-like and goes
+#   under Monocytes, as PCA cluster 3 did above.
+# - Cluster 10 is plasmacytoid DC (LRRC26, PTCRA, SCT, PTPRS, TCL1A). Its JCHAIN is
+#   high, which the authors' panel reads as plasma, but pDCs express JCHAIN too, and
+#   there is no plasma programme among its top markers. Stage 16 also files pDCs
+#   under DC. About 11% of its cells express CD19: this partition has no separate B
+#   cell cluster, and its B cells appear to sit here. That is left visible as a real
+#   difference between the arms, not corrected.
+# - Cluster 11 is the XIST and long-transcript cluster seen in every arm, with no
+#   canonical marker above 50% across 57 patients: Undetermined.
+authors_pipeline_annotation <- list(
+  "T Cells"      = c("0", "1", "2", "4", "8", "9"),
+  "Monocytes"    = c("3", "7"),
+  "DC"           = c("5", "10"),
+  "NK Cells"     = c("6"),
+  "Undetermined" = c("11")
+)
+
+# scGPT, uncorrected: 12 clusters, read the same way.
+# - Cluster 2 is the same macrophage-like population: Monocytes.
+# - Cluster 9 is plasmacytoid DC, on the same markers as the authors' cluster 10.
+# - Cluster 10 (CD79A, CD19, VPREB3, FCRLA) is B cells.
+# - Cluster 7 is naive/central memory T (LEF1, IL7R, SELL), but 47% of it comes from
+#   one patient: uncorrected scGPT kept part of that patient's cells together. The
+#   label follows the biology; the patient concentration is reported with Stage 17.
+# - Cluster 11 (103 cells) is cycling (RRM2, UBE2C, BIRC5, TYMS) with CD3D 71%: T Cells.
+# - Cluster 8 is the XIST and long-transcript cluster: Undetermined.
+scgpt_raw_annotation <- list(
+  "T Cells"      = c("0", "1", "4", "7", "11"),
+  "Monocytes"    = c("2", "6"),
+  "DC"           = c("3", "9"),
+  "NK Cells"     = c("5"),
+  "B Cells"      = c("10"),
+  "Undetermined" = c("8")
+)
+
 annotations <- list(
+  authors_pipeline_cluster = authors_pipeline_annotation,
+  scgpt_raw_cluster = scgpt_raw_annotation,
   pca15_harmony_cluster = pca15_annotation,
   scgpt_harmony_cluster = scgpt_annotation
 )
@@ -176,23 +218,41 @@ utils::write.csv(evidence, file.path(output_dir, "annotation_rationale.csv"), ro
 message("\nDrawing labelled UMAPs...")
 dir.create(figure_dir, showWarnings = FALSE, recursive = TRUE)
 
-layouts <- utils::read.csv(
-  file.path(benchmark_dir, "benchmark_cluster_assignments.csv.gz"),
-  stringsAsFactors = FALSE
-)
-rownames(layouts) <- layouts$cell_barcode
-if (!setequal(layouts$cell_barcode, frozen$cell_barcode)) {
-  stop("Stage 06's layouts do not describe the same cells as the frozen labels")
+# Each partition is drawn on the layout Stage 14 used for it: the Harmony arms on
+# Stage 06's, the authors' pipeline on Stage 03's integrated UMAP, and uncorrected
+# scGPT on Stage 04's UMAP of the same embedding. Every file is joined by barcode.
+read_layout <- function(path, columns, prefix) {
+  table <- utils::read.csv(path, stringsAsFactors = FALSE)
+  if (!setequal(table$cell_barcode, frozen$cell_barcode)) {
+    stop(basename(path), " does not describe the same cells as the frozen labels")
+  }
+  rownames(table) <- table$cell_barcode
+  table <- table[frozen$cell_barcode, columns, drop = FALSE]
+  colnames(table) <- paste0(prefix, c("_UMAP_1", "_UMAP_2"))
+  table
 }
-layouts <- layouts[frozen$cell_barcode, , drop = FALSE]
+results_dir <- dirname(benchmark_dir)
+benchmark_file <- file.path(benchmark_dir, "benchmark_cluster_assignments.csv.gz")
+layouts <- cbind(
+  read_layout(benchmark_file, c("pca_harmony_UMAP_1", "pca_harmony_UMAP_2"), "pca_harmony"),
+  read_layout(benchmark_file, c("scgpt_harmony_UMAP_1", "scgpt_harmony_UMAP_2"), "scgpt_harmony"),
+  read_layout(file.path(results_dir, "03_seurat_reproduction", "GSE200164_umap_clusters.csv.gz"),
+              c("UMAP_1", "UMAP_2"), "authors_pipeline"),
+  read_layout(file.path(results_dir, "04_scgpt_embedding", "GSE200164_scgpt_umap_clusters.csv.gz"),
+              c("UMAP_1", "UMAP_2"), "scgpt_raw")
+)
 
 placeholder <- Matrix::Matrix(0, nrow = 1, ncol = nrow(frozen), sparse = TRUE)
 rownames(placeholder) <- "placeholder"
 colnames(placeholder) <- frozen$cell_barcode
 csf <- CreateSeuratObject(counts = placeholder, assay = "RNA")
-umap_prefix <- c(pca15_harmony_cluster = "pca_harmony",
+umap_prefix <- c(authors_pipeline_cluster = "authors_pipeline",
+                 scgpt_raw_cluster = "scgpt_raw",
+                 pca15_harmony_cluster = "pca_harmony",
                  scgpt_harmony_cluster = "scgpt_harmony")
-partition_labels <- c(pca15_harmony_cluster = "PCA-15 Harmony",
+partition_labels <- c(authors_pipeline_cluster = "Authors' pipeline (Stage 03)",
+                      scgpt_raw_cluster = "scGPT, uncorrected",
+                      pca15_harmony_cluster = "PCA-15 Harmony",
                       scgpt_harmony_cluster = "scGPT Harmony")
 
 for (partition in names(annotations)) {

@@ -1,4 +1,4 @@
-# 08 — Cell-type annotation (first pass, broad categories)
+# 07 — Cell-type annotation (first pass, broad categories)
 
 **Question.** Which broad cell type is each cluster, in each arm?
 

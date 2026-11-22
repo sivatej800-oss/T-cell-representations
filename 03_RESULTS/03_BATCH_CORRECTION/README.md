@@ -48,4 +48,4 @@ the uncorrected donor-coloured layout comes from [`02_CODE/09_pca_raw_umap.R`](.
 Not linked: `benchmark_representations.rds` (all five reductions),
 `benchmark_pca_uncorrected.rds`, `benchmark_pca_raw_umap_coordinates.csv.gz`,
 `r_input/`, `benchmark_environment_audit.json`. The PCA-512 files in this folder
-belong to [06_DIMENSION_CONTROL](../06_DIMENSION_CONTROL/).
+belong to [05_DIMENSION_CONTROL](../05_DIMENSION_CONTROL/).

@@ -18,10 +18,10 @@ they are dangling until it has.
 | [02_SCGPT_BASELINE](02_SCGPT_BASELINE/) | What does the same workflow give on a frozen scGPT embedding? | 04–05 | `04_scgpt_embedding` |
 | [03_BATCH_CORRECTION](03_BATCH_CORRECTION/) | With Harmony applied to both, how much patient identity does each leak? | 06, 09 | `06_harmony_benchmark` |
 | [04_SILHOUETTE](04_SILHOUETTE/) | Which partition is more compact and separated, at native widths? | 07 | `07_silhouette` |
-| [05_ELBOW_WCSS](05_ELBOW_WCSS/) | Where does resolution 0.3 sit on each compactness curve? *(supporting)* | 08 | `08_wcss_sweep` |
-| [06_DIMENSION_CONTROL](06_DIMENSION_CONTROL/) | Does the PCA-vs-scGPT silhouette pattern hold at 512 dimensions? | 10–11 | `06_harmony_benchmark`, `11_silhouette_matched` |
-| [07_CELL_TYPE_MARKERS](07_CELL_TYPE_MARKERS/) | What does the RNA say each frozen cluster is? | 12–14 | `12_frozen_labels`, `13_marker_discovery`, `14_marker_evidence` |
-| [08_CELL_TYPE_ANNOTATION](08_CELL_TYPE_ANNOTATION/) | Which broad cell type is each cluster, in each arm? | 15 | `15_annotation` |
+| [05_DIMENSION_CONTROL](05_DIMENSION_CONTROL/) | Does the PCA-vs-scGPT silhouette pattern hold at 512 dimensions? | 10–11 | `06_harmony_benchmark`, `11_silhouette_matched` |
+| [06_CELL_TYPE_MARKERS](06_CELL_TYPE_MARKERS/) | What does the RNA say each frozen cluster is? | 12–14 | `12_frozen_labels`, `13_marker_discovery`, `14_marker_evidence` |
+| [07_CELL_TYPE_ANNOTATION](07_CELL_TYPE_ANNOTATION/) | Which broad cell type is each cluster, in each arm? | 15 | `15_annotation` |
+| [08_BIOLOGY_VS_PATIENT](08_BIOLOGY_VS_PATIENT/) | Does each arm's clustering follow cell type (SingleR) or the patient? | 16–17 | `16_singler_labels`, `17_biology_vs_donor` |
 | [09_T_CELL_SUBCLUSTERS](09_T_CELL_SUBCLUSTERS/) | **PLANNED / NOT YET COMPLETED** — CD4, CD8, Treg by reclustering | — | — |
 | [10_MONOCYTE_SUBCLUSTERS](10_MONOCYTE_SUBCLUSTERS/) | **PLANNED / NOT YET COMPLETED** — monocyte subtypes by reclustering | — | — |
 | [FINAL_FIGURES](FINAL_FIGURES/) | The figures chosen for the paper | — | — |
@@ -44,10 +44,9 @@ Rscript 02_CODE/09_pca_raw_umap.R \
   Age_trajectory/results/06_harmony_benchmark \
   Age_trajectory/results/figures 42
 python 02_CODE/07_silhouette_comparison.py      # 04_SILHOUETTE
-python 02_CODE/08_wcss_resolution_sweep.py      # 05_ELBOW_WCSS
-python 02_CODE/10_pca512_arm.py                 # 06_DIMENSION_CONTROL
+python 02_CODE/10_pca512_arm.py                 # 05_DIMENSION_CONTROL
 python 02_CODE/11_silhouette_dimension_matched.py
-python 02_CODE/12_freeze_cluster_labels.py      # 07_CELL_TYPE_MARKERS
+python 02_CODE/12_freeze_cluster_labels.py      # 06_CELL_TYPE_MARKERS
 python 02_CODE/13_marker_discovery.py
 python 02_CODE/14_marker_evidence.py
 Rscript 02_CODE/15_annotate_clusters.R \
@@ -55,5 +54,7 @@ Rscript 02_CODE/15_annotate_clusters.R \
   Age_trajectory/results/14_marker_evidence \
   Age_trajectory/results/06_harmony_benchmark \
   Age_trajectory/results/15_annotation \
-  Age_trajectory/results/figures                # 08_CELL_TYPE_ANNOTATION
+  Age_trajectory/results/figures                # 07_CELL_TYPE_ANNOTATION
+python 02_CODE/16_singler_reference_labels.py   # 08_BIOLOGY_VS_PATIENT
+python 02_CODE/17_cluster_structure_vs_singler.py
 ```

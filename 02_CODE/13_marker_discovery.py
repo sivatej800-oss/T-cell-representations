@@ -45,7 +45,14 @@ import pandas as pd
 REQUIRED_R_PACKAGES = ("Seurat", "Matrix", "jsonlite", "presto")
 
 # The frozen label columns, named as Stage 12 named them.
-PARTITIONS = ("pca15_harmony_cluster", "scgpt_harmony_cluster")
+# The main comparison is the authors' pipeline against uncorrected scGPT; the two
+# Harmony partitions are kept so the earlier comparison can still be re-run.
+PARTITIONS = (
+    "authors_pipeline_cluster",
+    "scgpt_raw_cluster",
+    "pca15_harmony_cluster",
+    "scgpt_harmony_cluster",
+)
 
 EXPECTED_CELLS = 70391
 EXPECTED_GENES = 19689
@@ -118,7 +125,8 @@ def verify_frozen_labels(paths: PipelinePaths) -> tuple[pd.DataFrame, str]:
             f"Frozen labels cover {len(frozen)} cells, expected {EXPECTED_CELLS}"
         )
 
-    columns = ["cell_barcode", *PARTITIONS]
+    # Stage 12 checksums every column it froze, in the order it wrote them.
+    columns = list(frozen.columns)
     payload = frozen[columns].to_csv(index=False).encode("utf-8")
     checksum = hashlib.sha256(payload).hexdigest()
 

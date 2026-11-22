@@ -2,7 +2,7 @@
 
 > **PLANNED / NOT YET COMPLETED.** No code has been written and no results exist.
 
-**Goal.** Subset the monocyte clusters from [08_CELL_TYPE_ANNOTATION](../08_CELL_TYPE_ANNOTATION/)
+**Goal.** Subset the monocyte clusters from [07_CELL_TYPE_ANNOTATION](../07_CELL_TYPE_ANNOTATION/)
 and recluster them, following the authors. This gives the Figure 1D labels classical,
 intermediate and non-classical monocytes, for each arm.
 

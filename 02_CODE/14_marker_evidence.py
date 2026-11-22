@@ -37,7 +37,14 @@ import pandas as pd
 
 REQUIRED_R_PACKAGES = ("Seurat", "Matrix", "ggplot2", "patchwork", "jsonlite")
 
-PARTITIONS = ("pca15_harmony_cluster", "scgpt_harmony_cluster")
+# The main comparison is the authors' pipeline against uncorrected scGPT; the two
+# Harmony partitions are kept so the earlier comparison can still be re-run.
+PARTITIONS = (
+    "authors_pipeline_cluster",
+    "scgpt_raw_cluster",
+    "pca15_harmony_cluster",
+    "scgpt_harmony_cluster",
+)
 
 # The paper's panel, in the paper's order. CD44 is included here and was not in the
 # 13-gene set Stage 13 scored, so Stage 14 recomputes the panel rather than reading
@@ -121,7 +128,7 @@ def verify_stage13(paths: PipelinePaths) -> dict:
             f"(assay={audit.get('assay')}, slot={audit.get('slot')})"
         )
     if sorted(audit.get("partitions", [])) != sorted(PARTITIONS):
-        raise ValueError("Stage 13 did not test the two partitions this stage expects")
+        raise ValueError("Stage 13 did not test the partitions this stage expects")
 
     fingerprint = audit.get("expression_fingerprint", {})
     if fingerprint.get("n_cells") != EXPECTED_CELLS or fingerprint.get("n_genes") != EXPECTED_GENES:

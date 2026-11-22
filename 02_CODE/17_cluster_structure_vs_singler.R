@@ -1,22 +1,25 @@
 # Stage 17: does cluster structure follow biology or the patient?
 #
-# Stage 06 measured how strongly each clustering tracks which patient a cell came from
-# (donor NMI). That is only half of the question: a clustering can be mostly biology and
-# still carry some patient signal, or the reverse. This stage measures the other half --
-# how strongly each clustering tracks cell type -- using labels that belong to neither
-# arm: SingleR's per-cell calls against purified immune profiles (Stage 16). It covers the
-# PCA (15 PCs) and scGPT arms, each uncorrected and Harmony-corrected.
+# A clustering can be mostly biology and still carry some patient signal, or the reverse.
+# This stage measures both halves for the two arms of the main comparison -- the authors'
+# published pipeline (Stage 03) and scGPT used out of the box (Stage 06's scgpt_raw) --
+# using, for biology, labels that belong to neither arm: SingleR's per-cell calls against
+# purified immune profiles (Stage 16).
+#
+# The authors' pipeline includes anchor integration across patients and scGPT raw has no
+# correction at all. That is the comparison intended: a lower patient NMI for the authors'
+# arm is expected, and the question is how far scGPT gets without any correction.
 #
 # Three things are measured.
 #   A. Patient NMI and biology NMI side by side, per arm.
-#   B. How closely each Harmony arm's hand annotation (Stage 15) agrees with SingleR, cell
-#      by cell, with the monocyte/DC boundary kept apart and then merged into one group.
+#   B. How closely each arm's hand annotation (Stage 15) agrees with SingleR, cell by
+#      cell, with the monocyte/DC boundary kept apart and then merged into one group.
 #   C. For the Monocyte/DC disagreements specifically, what marker genes say about
 #      which side is right.
 #
 # SingleR's "unassigned" cells (pruned label NA) are excluded from every biology
 # comparison. Patient NMI uses all cells, because patient identity is known for every
-# cell and the check against Stage 06's value is on the full set.
+# cell and scGPT's check against Stage 06's value is on the full set.
 #
 # The expression is Stage 13/16's: SoupX-corrected counts, fractional on purpose,
 # log-normalized once. Nothing is rounded, cast or filtered.
@@ -32,20 +35,19 @@ suppressPackageStartupMessages({
 })
 
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) != 9) {
+if (length(args) != 8) {
   stop("Usage: 17_cluster_structure_vs_singler.R <seurat_input_dir> <cluster_csv> ",
-       "<donor_leakage_csv> <singler_csv> <old_stage15_csv> <annotation_csv> <output_dir> ",
+       "<donor_leakage_csv> <singler_csv> <annotation_csv> <output_dir> ",
        "<workers> <figure_dir>")
 }
 input_dir <- args[1]
 cluster_csv <- args[2]
 leakage_csv <- args[3]
 singler_csv <- args[4]
-old_stage15_csv <- args[5]
-annotation_csv <- args[6]
-output_dir <- args[7]
-n_workers <- as.integer(args[8])
-figure_dir <- args[9]
+annotation_csv <- args[5]
+output_dir <- args[6]
+n_workers <- as.integer(args[7])
+figure_dir <- args[8]
 
 expected_cells <- 70391
 expected_genes <- 19689
@@ -56,27 +58,22 @@ stage13_data_sum <- 176503092.94553709
 sum_tolerance <- 1e-9
 
 # --- The arms ---------------------------------------------------------------------
-# One entry per clustering. `cluster_column` is the arm's column in Stage 06's cluster file.
-# An arm with an `annotation_column` has a hand annotation in Stage 15's file (and the
-# `stage15_cluster_column` that annotation was made on, checked against Stage 06's); an arm
-# without one gets the NMI measurements only. `corrected_from` names the uncorrected arm a
-# Harmony arm was derived from (it draws the arrow); `family` gives each representation one
-# colour; `umap_prefix` names the arm's own UMAP columns. To add an arm, add an entry.
-#
-# pca_harmony is the main 15-PC arm, as in the authors' dims = 1:15. pca_harmony_30dims is
-# deliberately not here.
+# One entry per clustering. `cluster_column` and `annotation_column` are the arm's frozen
+# partition and its hand annotation, both read from Stage 15's file. `stage06_arm` names
+# the Stage 06 column the partition must equal cell for cell, where one exists; the
+# authors' partition comes from Stage 03 and has none. `umap_file` is the arm's own UMAP,
+# the same layout Stages 14 and 15 draw it on: Stage 03's integrated UMAP for the
+# authors' pipeline, Stage 04's UMAP of the same scGPT embedding for scGPT raw.
+results_dir <- dirname(dirname(cluster_csv))
 arms <- list(
-  list(name = "pca_raw", label = "PCA raw", family = "PCA", corrected_from = NA_character_,
-       cluster_column = "pca_raw", annotation_column = NULL),
-  list(name = "scgpt_raw", label = "scGPT raw", family = "scGPT", corrected_from = NA_character_,
-       cluster_column = "scgpt_raw", annotation_column = NULL),
-  list(name = "pca_harmony", label = "PCA + Harmony", family = "PCA", corrected_from = "pca_raw",
-       cluster_column = "pca_harmony", annotation_column = "pca15_harmony_cluster_identity",
-       stage15_cluster_column = "pca15_harmony_cluster", umap_prefix = "pca_harmony"),
-  list(name = "scgpt_harmony", label = "scGPT + Harmony", family = "scGPT",
-       corrected_from = "scgpt_raw",
-       cluster_column = "scgpt_harmony", annotation_column = "scgpt_harmony_cluster_identity",
-       stage15_cluster_column = "scgpt_harmony_cluster", umap_prefix = "scgpt_harmony")
+  list(name = "authors_pipeline", label = "Authors' pipeline", family = "Authors",
+       cluster_column = "authors_pipeline_cluster",
+       annotation_column = "authors_pipeline_cluster_identity", stage06_arm = NA_character_,
+       umap_file = file.path(results_dir, "03_seurat_reproduction", "GSE200164_umap_clusters.csv.gz")),
+  list(name = "scgpt_raw", label = "scGPT raw", family = "scGPT",
+       cluster_column = "scgpt_raw_cluster",
+       annotation_column = "scgpt_raw_cluster_identity", stage06_arm = "scgpt_raw",
+       umap_file = file.path(results_dir, "04_scgpt_embedding", "GSE200164_scgpt_umap_clusters.csv.gz"))
 )
 
 # Marker genes for telling monocytes from dendritic cells: classical/non-classical
@@ -173,12 +170,10 @@ clusters <- align_to_matrix(
   utils::read.csv(cluster_csv, colClasses = "character"), "cell_barcode", "cluster assignments")
 singler <- align_to_matrix(
   utils::read.csv(singler_csv, colClasses = "character"), "cell_barcode", "Stage 16 labels")
-old15 <- align_to_matrix(
-  utils::read.csv(old_stage15_csv, colClasses = "character"), "cell_barcode", "old Stage 15")
 annotation <- align_to_matrix(
   utils::read.csv(annotation_csv, colClasses = "character"), "cell_barcode", "Stage 15 annotation")
 stopifnot(identical(clusters$cell_barcode, barcodes), identical(singler$cell_barcode, barcodes),
-          identical(old15$cell_barcode, barcodes), identical(annotation$cell_barcode, barcodes))
+          identical(annotation$cell_barcode, barcodes))
 patients <- clusters$internal_sample_id
 if (anyNA(patients)) stop("A cell has no patient identifier")
 
@@ -259,18 +254,17 @@ message(sprintf("\nMain-run vs fine-derived main label: %d of %d cells assigned 
                 sum(disagree), sum(both_assigned), 100 * sum(disagree) / sum(both_assigned)))
 
 # --- Step 4: each annotated arm's per-cell identity, from Stage 15 --------------------
-# Stage 15's file is the only source of the annotation: this stage no longer carries its own
-# copy of the cluster-to-identity tables. It is checked, not trusted: Stage 15 must have
-# annotated the same partitions Stage 06 produced, and every cluster must carry exactly one
-# identity. "Undetermined" is Stage 15's label for a cluster the marker panel could not
+# Stage 15's file is the only source of the annotation: this stage carries no copy of the
+# cluster-to-identity tables. It is checked, not trusted: scGPT's partition must equal the
+# one Stage 06 produced, and every cluster must carry exactly one identity. "Undetermined" is Stage 15's label for a cluster the marker panel could not
 # resolve (XIST and long-transcript genes, no lineage marker).
 VALID_IDENTITIES <- c("T Cells", "NK Cells", "DC", "Monocytes", "B Cells", "Undetermined")
 
 identity_by_arm <- list()
 annotation_rows <- list()
 for (arm in arms) {
-  if (is.null(arm$annotation_column)) next
-  if (!identical(annotation[[arm$stage15_cluster_column]], clusters[[arm$cluster_column]])) {
+  if (!is.na(arm$stage06_arm) &&
+      !identical(annotation[[arm$cluster_column]], clusters[[arm$stage06_arm]])) {
     stop(arm$name, ": Stage 15's clusters differ from Stage 06's, cell by cell")
   }
   identity <- annotation[[arm$annotation_column]]
@@ -279,11 +273,11 @@ for (arm in arms) {
     stop(arm$name, ": unexpected identities: ",
          paste(setdiff(identity, VALID_IDENTITIES), collapse = ", "))
   }
-  identities_per_cluster <- tapply(identity, clusters[[arm$cluster_column]],
+  identities_per_cluster <- tapply(identity, annotation[[arm$cluster_column]],
                                    function(x) length(unique(x)))
   if (any(identities_per_cluster != 1)) stop(arm$name, ": a cluster carries two identities")
   identity_by_arm[[arm$name]] <- identity
-  pairs <- unique(data.frame(cluster = clusters[[arm$cluster_column]], identity = identity,
+  pairs <- unique(data.frame(cluster = annotation[[arm$cluster_column]], identity = identity,
                              stringsAsFactors = FALSE))
   annotation_rows[[arm$name]] <- cbind(arm = arm$name, pairs[order(as.integer(pairs$cluster)), ])
   message(sprintf("%s identities: %s", arm$name,
@@ -313,41 +307,27 @@ merge_labels <- function(labels) {
 }
 utils::write.csv(merge_table, file.path(output_dir, "myeloid_merge_table.csv"), row.names = FALSE)
 
-# The rebuild's annotation against the superseded Stage 15, where the old file has the
-# same column. Reported, not asserted: the rebuilt Stage 15 added the Undetermined group.
-old_match <- list()
-for (arm in arms) {
-  if (is.null(arm$annotation_column)) next
-  old_identity <- old15[[arm$annotation_column]]
-  if (is.null(old_identity)) next
-  old_match[[arm$name]] <- list(pct_cells_same_identity_as_old_stage15 =
-                                  100 * mean(identity_by_arm[[arm$name]] == old_identity))
-  message(sprintf("%s: %.2f%% of cells keep their superseded Stage 15 identity", arm$name,
-                  old_match[[arm$name]]$pct_cells_same_identity_as_old_stage15))
-}
-checks$identity_vs_old_stage15 <- old_match
 checks$identity_counts <- lapply(identity_by_arm, function(x) as.list(table(x)))
 
 # --- Step 5: A -- patient NMI and biology NMI per arm ---------------------------------
-# The patient NMI is recomputed here on all cells and must equal the value Stage 06 wrote;
-# agreement shows this stage reads the same clusters and the same patients as Stage 06.
+# Patient NMI is computed on all cells. For scGPT it must equal the value Stage 06 wrote,
+# which shows this stage reads the same clusters and the same patients; the authors'
+# partition has no Stage 06 value and is measured here for the first time.
 # Biology NMI uses assigned cells only, at full resolution and with Myeloid merged.
 leakage <- utils::read.csv(leakage_csv, stringsAsFactors = FALSE)
-expected_patient_nmi <- c(scgpt_raw = 0.0721503826775315, scgpt_harmony = 0.0506991838687104,
-                          pca_raw = 0.0489403923224483, pca_harmony = 0.0380828878753405)
+expected_patient_nmi <- c(scgpt_raw = 0.0721503826775315)
 
 nmi_rows <- list()
 for (arm in arms) {
-  cluster_ids <- clusters[[arm$cluster_column]]
+  cluster_ids <- annotation[[arm$cluster_column]]
   if (anyNA(cluster_ids)) stop(arm$name, ": a cell has no cluster")
   patient_nmi <- normalized_mutual_information(cluster_ids, patients)
-  recorded <- leakage$donor_nmi[leakage$arm == arm$name]
-  if (length(recorded) != 1 || abs(patient_nmi - recorded) > 1e-12) {
-    stop(arm$name, ": patient NMI ", patient_nmi, " differs from Stage 06's ", recorded)
-  }
-  if (!arm$name %in% names(expected_patient_nmi) ||
-      abs(patient_nmi - expected_patient_nmi[[arm$name]]) > 1e-12) {
-    stop(arm$name, ": patient NMI differs from the expected value")
+  if (!is.na(arm$stage06_arm)) {
+    recorded <- leakage$donor_nmi[leakage$arm == arm$stage06_arm]
+    if (length(recorded) != 1 || abs(patient_nmi - recorded) > 1e-12 ||
+        abs(patient_nmi - expected_patient_nmi[[arm$name]]) > 1e-12) {
+      stop(arm$name, ": patient NMI ", patient_nmi, " differs from Stage 06's ", recorded)
+    }
   }
   nmi_rows[[arm$name]] <- data.frame(
     arm = arm$name,
@@ -363,7 +343,7 @@ for (arm in arms) {
 nmi_table <- do.call(rbind, nmi_rows)
 utils::write.csv(nmi_table, file.path(output_dir, "nmi_by_arm.csv"), row.names = FALSE)
 message("\n--- A: patient vs biology NMI ---"); print(nmi_table, row.names = FALSE)
-checks$patient_nmi_matches_stage06 <- TRUE
+checks$scgpt_raw_patient_nmi_matches_stage06 <- TRUE
 
 # --- Step 6: B -- hand annotation vs SingleR ------------------------------------------
 # Agreement is an exact label match on cells SingleR assigned. Cells in an "Undetermined"
@@ -416,7 +396,6 @@ agreement_for <- function(arm_name, resolution) {
 agreement_results <- list()
 overall_rows <- list()
 for (arm in arms) {
-  if (is.null(arm$annotation_column)) next
   for (resolution in c("full", "merged_myeloid")) {
     result <- agreement_for(arm$name, resolution)
     agreement_results[[arm$name]][[resolution]] <- result
@@ -447,7 +426,6 @@ message("\n--- B: overall agreement ---"); print(agreement_table, row.names = FA
 # shows which side the expression sides with.
 marker_rows <- list()
 for (arm in arms) {
-  if (is.null(arm$annotation_column)) next
   mine_all <- identity_by_arm[[arm$name]]
   group_defs <- list(
     "mine Monocytes / SingleR DC" = assigned & mine_all == "Monocytes" & singler$broad_label == "DC",
@@ -483,8 +461,8 @@ audit <- list(
                   Seurat = seurat_version),
   r_version = paste(R.version$major, R.version$minor, sep = "."),
   arms = vapply(arms, function(a) a$name, character(1)),
-  excluded_arms = list(pca_harmony_30dims =
-    "30-PC variant of the PCA arm; the 15-PC pca_harmony is the main arm, as in the authors' dims = 1:15"),
+  excluded_arms = list(harmony_arms =
+    "pca_raw, pca_harmony, scgpt_harmony: the earlier Harmony comparison, outputs kept in 17_biology_vs_donor_harmony_record"),
   reference = "celldex::MonacoImmuneData(), labels = label.main",
   myeloid_merge = merge_table,
   n_shared_genes = length(shared_genes),
@@ -496,7 +474,7 @@ writeLines(jsonlite::toJSON(audit, auto_unbox = TRUE, pretty = TRUE, digits = 12
            file.path(output_dir, "stage17_audit_r.json"))
 
 # --- Step 9: figures ----------------------------------------------------------------------
-# One palette and one function per figure kind, called once per arm, so PCA and scGPT are
+# One palette and one function per figure kind, called once per arm, so the two arms are
 # drawn identically. Figures go to the tracked figures folder.
 dir.create(figure_dir, showWarnings = FALSE, recursive = TRUE)
 
@@ -516,40 +494,24 @@ CELLTYPE_COLOURS <- c(
   "unassigned"   = "gray"
 )
 stopifnot(all(singler$broad_label %in% names(CELLTYPE_COLOURS)))
-family_colours <- c("scGPT" = "steelblue4", "PCA" = "darkorange3")
+family_colours <- c("scGPT" = "steelblue4", "Authors" = "darkorange3")
 
-# Figure 1. Patient NMI against biology NMI, one point per arm. An arrow runs from each
-# uncorrected arm to the Harmony arm derived from it.
+# Figure 1. Patient NMI against biology NMI, one point per arm.
 points <- do.call(rbind, lapply(arms, function(a) {
   row <- nmi_table[nmi_table$arm == a$name, ]
   data.frame(arm = a$name, label = a$label, family = a$family,
-             corrected_from = a$corrected_from,
              patient_nmi = row$patient_nmi, biology_nmi = row$biology_nmi,
              stringsAsFactors = FALSE)
 }))
-arrows <- points[!is.na(points$corrected_from), ]
-arrows$x_start <- points$patient_nmi[match(arrows$corrected_from, points$arm)]
-arrows$y_start <- points$biology_nmi[match(arrows$corrected_from, points$arm)]
 x_limits <- c(0, max(0.1, 1.3 * max(points$patient_nmi)))
 y_pad <- max(0.1, 0.5 * diff(range(points$biology_nmi)))
 y_limits <- c(max(0, min(points$biology_nmi) - y_pad), min(1, max(points$biology_nmi) + y_pad))
-# Pull each arrow back from both points so the head lands beside the corrected point.
-shrink <- 0.12
-arrows$x_from <- arrows$x_start + shrink * (arrows$patient_nmi - arrows$x_start)
-arrows$y_from <- arrows$y_start + shrink * (arrows$biology_nmi - arrows$y_start)
-arrows$x_to <- arrows$patient_nmi - shrink * (arrows$patient_nmi - arrows$x_start)
-arrows$y_to <- arrows$biology_nmi - shrink * (arrows$biology_nmi - arrows$y_start)
-# Uncorrected arms are labelled to the right of their point, corrected arms to the left.
-points$corrected <- !is.na(points$corrected_from)
 label_offset <- 0.012 * diff(x_limits) / 0.1
 
 figure_scatter <- ggplot(points, aes(x = patient_nmi, y = biology_nmi, colour = family)) +
-  geom_segment(data = arrows, aes(x = x_from, y = y_from, xend = x_to, yend = y_to),
-               arrow = arrow(length = unit(0.3, "cm"), type = "closed"),
-               linewidth = 0.6, show.legend = FALSE) +
   geom_point(size = 3.5) +
-  geom_text(aes(x = patient_nmi + ifelse(corrected, -label_offset, label_offset),
-                label = label, hjust = ifelse(corrected, 1, 0)), size = 4, show.legend = FALSE) +
+  geom_text(aes(x = patient_nmi + label_offset, label = label), hjust = 0, size = 4,
+            show.legend = FALSE) +
   scale_colour_manual(values = family_colours, guide = "none") +
   coord_cartesian(xlim = x_limits, ylim = y_limits) +
   labs(x = "Patient NMI (lower is better)", y = "Biology NMI (higher is better)") +
@@ -557,9 +519,11 @@ figure_scatter <- ggplot(points, aes(x = patient_nmi, y = biology_nmi, colour = 
 ggsave(file.path(figure_dir, "17_patient_vs_biology_scatter.png"), figure_scatter,
        width = 6.5, height = 5, dpi = 150)
 
-# Figure 2. Annotation against SingleR, one heatmap per Harmony arm. Rows, columns and the
-# colour scale are fixed so the two arms can be read against each other; each row is a
-# percentage of that annotated type, with its cell count beside the name.
+# Figure 2. Annotation against SingleR, one heatmap per arm. Rows, columns and the colour
+# scale are fixed so the two arms can be read against each other; each row is a percentage
+# of that annotated type, with its cell count beside the name. A type an arm never assigns
+# (the authors' pipeline has no B cell cluster) stays as an empty row with n = 0, so the
+# absence is visible rather than silently dropped.
 heatmap_rows <- c("T Cells", "NK Cells", "DC", "Monocytes", "B Cells", "Undetermined")
 heatmap_columns <- c("T Cells", "NK Cells", "DC", "Monocytes", "B Cells", "Plasma Cells", "Progenitors")
 draw_heatmap <- function(arm) {
@@ -574,7 +538,9 @@ draw_heatmap <- function(arm) {
                                           paste(confusion$my_identity, confusion$singler_broad_label))]
   grid$row_pct[is.na(grid$row_pct)] <- 0
   row_n <- tapply(confusion$n_cells, confusion$my_identity, sum)[heatmap_rows]
-  if (any(abs(tapply(grid$row_pct, grid$my_identity, sum)[heatmap_rows] - 100) > 1e-9)) {
+  row_n[is.na(row_n)] <- 0
+  row_sums <- tapply(grid$row_pct, grid$my_identity, sum)[heatmap_rows]
+  if (any(abs(row_sums[row_n > 0] - 100) > 1e-9)) {
     stop(arm$name, ": a row of the heatmap does not sum to 100%")
   }
   grid$my_identity <- factor(grid$my_identity, levels = rev(heatmap_rows),
@@ -597,25 +563,39 @@ draw_heatmap <- function(arm) {
          width = 10, height = 4.8, dpi = 150)
 }
 
-# Figure 3. The arm's own UMAP three times with identical axes: coloured by SingleR, by the
-# annotation, and the cells where the two disagree. Cells are drawn in a seeded shuffled
-# order so no type sits on top of another. Only the SingleR panel carries the legend.
+# Figure 3. The arm's own UMAP three times with identical axes: coloured by SingleR, by
+# the hand annotation, and the cells where the two disagree. The third panel colours each
+# disagreeing cell by what the disagreement is (annotation -> SingleR), the four most
+# common kinds by name and the rest together, and labels each named kind where its
+# cells sit, so the figure says where the disagreement is and what it is. Labels are
+# repelled from each other, because two kinds can sit in the same island. The colours
+# avoid the cell-type palette's reds so a disagreement is never read as Progenitors.
+# Cells are drawn in a seeded shuffled order so no type sits on top of another.
+DISAGREE_COLOURS <- c("blue3", "darkorange2", "purple3", "forestgreen", "gray45")
 draw_umap <- function(arm) {
+  layout <- align_to_matrix(utils::read.csv(arm$umap_file, colClasses = "character"),
+                            "cell_barcode", basename(arm$umap_file))
   umap <- data.frame(
-    x = as.numeric(clusters[[paste0(arm$umap_prefix, "_UMAP_1")]]),
-    y = as.numeric(clusters[[paste0(arm$umap_prefix, "_UMAP_2")]]),
-    singler = singler$broad_label,
-    annotation = identity_by_arm[[arm$name]],
+    x = as.numeric(layout$UMAP_1), y = as.numeric(layout$UMAP_2),
+    singler = singler$broad_label, annotation = identity_by_arm[[arm$name]],
     stringsAsFactors = FALSE
   )
   if (anyNA(umap$x) || anyNA(umap$y)) stop(arm$name, ": a cell has no UMAP coordinates")
-  # Undetermined cells have no annotation to disagree with, so they are not drawn as
-  # disagreements; this is the same rule the agreement table uses.
+  # Undetermined cells have no annotation to disagree with, the same rule the agreement
+  # table uses, so the count here must equal that table's.
   umap$disagree <- assigned & umap$annotation != "Undetermined" & umap$annotation != umap$singler
   full <- agreement_results[[arm$name]]$full$overall
   if (sum(umap$disagree) != full$n_cells_scored - full$n_agree) {
     stop(arm$name, ": the disagreement count does not match the agreement table")
   }
+  pair <- paste0(umap$annotation, " \u2192 SingleR ", umap$singler)
+  kinds <- sort(table(pair[umap$disagree]), decreasing = TRUE)
+  named <- names(kinds)[seq_len(min(4, length(kinds)))]
+  umap$kind <- ifelse(!umap$disagree, NA_character_,
+                      ifelse(pair %in% named, pair, "other"))
+  kind_levels <- c(named, if (any(umap$kind == "other", na.rm = TRUE)) "other")
+  kind_n <- table(factor(umap$kind, levels = kind_levels))
+  kind_labels <- sprintf("%s (%s)", kind_levels, prettyNum(as.integer(kind_n), big.mark = ","))
   set.seed(42)
   umap <- umap[sample(nrow(umap)), ]
 
@@ -637,20 +617,42 @@ draw_umap <- function(arm) {
       ggtitle(title) + axes +
       theme(legend.key.size = unit(0.7, "cm"), legend.text = element_text(size = 12))
   }
+  disagreeing <- umap[umap$disagree, ]
+  disagreeing$kind <- factor(disagreeing$kind, levels = kind_levels, labels = kind_labels)
+  # Where each named kind sits: the median position of its cells.
+  centres <- do.call(rbind, lapply(kind_levels[kind_levels != "other"], function(k) {
+    cells <- umap[!is.na(umap$kind) & umap$kind == k, ]
+    data.frame(x = median(cells$x), y = median(cells$y),
+               label = sprintf("%s\n%s cells", sub(" \u2192 SingleR ", " \u2192 ", k),
+                               prettyNum(nrow(cells), big.mark = ",")))
+  }))
   disagree_panel <- ggplot(umap, aes(x = x, y = y)) +
     geom_point(colour = "gray90", size = 0.3, stroke = 0) +
-    geom_point(data = umap[umap$disagree, ], colour = "blue3", size = 0.3, stroke = 0) +
-    ggtitle(sprintf("Disagree (n = %s)", prettyNum(sum(umap$disagree), big.mark = ","))) + axes
+    geom_point(data = disagreeing, aes(colour = kind), size = 0.5, stroke = 0) +
+    ggrepel::geom_label_repel(data = centres, aes(x = x, y = y, label = label), size = 3.2,
+                              label.size = 0.2, alpha = 0.9, lineheight = 0.9,
+                              min.segment.length = 0, box.padding = 0.6, seed = 42) +
+    scale_colour_manual(values = setNames(DISAGREE_COLOURS[seq_along(kind_labels)], kind_labels),
+                        name = "annotation \u2192 SingleR",
+                        guide = guide_legend(override.aes = list(size = 4))) +
+    ggtitle(sprintf("Disagree: %s of %s cells (%.1f%%)",
+                    prettyNum(sum(umap$disagree), big.mark = ","),
+                    prettyNum(full$n_cells_scored, big.mark = ","),
+                    100 - full$pct_agree)) + axes
   figure <- (colour_panel("singler", paste(arm$label, "- SingleR"), TRUE) |
                colour_panel("annotation", paste(arm$label, "- Annotation"), FALSE) |
                disagree_panel) +
     plot_layout(guides = "collect")
   ggsave(file.path(figure_dir, paste0("17_umap_singler_vs_annotation_", arm$name, ".png")),
-         figure, width = 17, height = 5.5, dpi = 150)
+         figure, width = 20, height = 6, dpi = 150)
+  utils::write.csv(stats::setNames(as.data.frame(kinds, responseName = "n_cells",
+                                                 stringsAsFactors = FALSE),
+                                   c("annotation_vs_singler", "n_cells")),
+                   file.path(output_dir, paste0("disagreement_kinds_", arm$name, ".csv")),
+                   row.names = FALSE)
 }
 
 for (arm in arms) {
-  if (is.null(arm$annotation_column)) next
   draw_heatmap(arm)
   draw_umap(arm)
 }

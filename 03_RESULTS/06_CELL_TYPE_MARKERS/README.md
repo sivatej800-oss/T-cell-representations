@@ -1,4 +1,4 @@
-# 07 — Cell-type markers
+# 06 — Cell-type markers
 
 **Question.** Geometry cannot tell whether a cluster is a cell type. What does the
 RNA say each cluster is?

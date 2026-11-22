@@ -1,4 +1,4 @@
-# 06 — Dimension control (PCA-512 against scGPT-512)
+# 05 — Dimension control (PCA-512 against scGPT-512)
 
 **Question.** Is the silhouette comparison between PCA and scGPT just a consequence of
 the arms having different numbers of dimensions (15 against 512)?

@@ -10,7 +10,7 @@ Go through the folders in this order:
 | 1 | [`01_PROJECT_OVERVIEW/STATUS.md`](01_PROJECT_OVERVIEW/STATUS.md) | Research question, what's done, headline results, what's next, scope. **Read this first.** |
 | | [`01_PROJECT_OVERVIEW/ANALYSIS_WALKTHROUGH.md`](01_PROJECT_OVERVIEW/ANALYSIS_WALKTHROUGH.md) | The full scientific write-up of every stage: methods, diagrams, numbers, caveats. |
 | 2 | [`02_CODE/`](02_CODE/) | The pipeline, numbered by stage. Run from the repository root. Most stages are a `.py` that drives its matching `.R`; Stages 09 and 15 are R-only and run with `Rscript` (see `03_RESULTS/README.md`). |
-| 3 | [`03_RESULTS/`](03_RESULTS/) | Results by scientific question (`01_PCA_BASELINE` … `08_CELL_TYPE_ANNOTATION`), each with a README. |
+| 3 | [`03_RESULTS/`](03_RESULTS/) | Results by scientific question (`01_PCA_BASELINE` … `10_MONOCYTE_SUBCLUSTERS`), each with a README. |
 | 4 | [`04_PAPER/`](04_PAPER/) | Outline and abstract. |
 | 5 | [`05_REFERENCES/`](05_REFERENCES/) | The original paper, its published figure, and the authors' code. |
 

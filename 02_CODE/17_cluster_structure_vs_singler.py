@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """Stage 17: does cluster structure follow biology or the patient?
 
-Stage 06 measured how strongly each clustering tracks the patient a cell came from. This
-stage measures the other half -- how strongly each clustering tracks cell type -- against
-SingleR labels (Stage 16) that belong to neither arm, for the PCA (15 PCs) and scGPT arms,
-uncorrected and Harmony-corrected. It also compares each Harmony arm's hand annotation
-(Stage 15) with SingleR cell by cell, and looks at marker genes for the Monocyte/DC cells
-the two disagree about. pca_harmony_30dims is deliberately left out.
+For the two arms of the main comparison -- the authors' published pipeline (Stage 03) and
+scGPT used out of the box (Stage 06's scgpt_raw) -- this stage measures how strongly each
+clustering tracks the patient a cell came from and how strongly it tracks cell type, the
+latter against SingleR labels (Stage 16) that belong to neither arm. It also compares each
+arm's hand annotation (Stage 15) with SingleR cell by cell, and looks at marker genes for
+the Monocyte/DC cells the two disagree about.
 
-The Stage 06 clusters were rebuilt after Stage 16's inputs were fixed, so before anything
-is measured this file checks that the rebuilt clusters still describe the same cells and
-that the one arm the rebuild should not have changed (scgpt_raw) is unchanged.
+The earlier four-arm version of this stage (PCA and scGPT, each with and without Harmony)
+is in git history; its outputs are kept in results/17_biology_vs_donor_harmony_record/.
 
 This file checks inputs and hands them to R. It performs no biological analysis.
 """
@@ -37,10 +36,8 @@ EXPECTED_CELLS = 70391
 EXPECTED_GENES = 19689
 TOTAL_CORES = 16
 
-# Fraction of cells whose scGPT-Harmony cluster must agree between the old and rebuilt
-# Stage 06 is reported, not asserted: Harmony is stochastic enough that a small share of
-# cells moves. What is asserted is that cluster identities survived.
-SCGPT_CLUSTER_COLUMN = "scgpt_harmony"
+# The two arms, named as the R script names them.
+ARMS = ("authors_pipeline", "scgpt_raw")
 
 @dataclass(frozen=True)
 class PipelinePaths:
@@ -71,20 +68,6 @@ class PipelinePaths:
     @property
     def annotation(self) -> Path:
         return self.workspace / "results" / "15_annotation" / "annotated_cluster_labels.csv.gz"
-
-    @property
-    def old_clusters(self) -> Path:
-        return (
-            self.workspace / "results_superseded_2026-11-22" / "results"
-            / "06_harmony_benchmark" / "benchmark_cluster_assignments.csv.gz"
-        )
-
-    @property
-    def old_stage15(self) -> Path:
-        return (
-            self.workspace / "results_superseded_2026-11-22" / "results"
-            / "15_annotation" / "annotated_cluster_labels.csv.gz"
-        )
 
     @property
     def figure_dir(self) -> Path:
@@ -128,8 +111,6 @@ def verify_same_cells(paths: PipelinePaths) -> dict[str, pd.DataFrame]:
             paths.donor_leakage,
             paths.singler,
             paths.annotation,
-            paths.old_clusters,
-            paths.old_stage15,
         ]
     )
     barcodes = (paths.seurat_input_dir / "barcodes.tsv").read_text(encoding="utf-8").split()
@@ -140,9 +121,7 @@ def verify_same_cells(paths: PipelinePaths) -> dict[str, pd.DataFrame]:
         raise ValueError(f"Expected {EXPECTED_GENES} unique genes, found {len(genes)}")
 
     sources = {
-        "new_clusters": pd.read_csv(paths.clusters, dtype=str),
-        "old_clusters": pd.read_csv(paths.old_clusters, dtype=str),
-        "old_stage15": pd.read_csv(paths.old_stage15, dtype=str),
+        "stage06_clusters": pd.read_csv(paths.clusters, dtype=str),
         "singler": pd.read_csv(paths.singler, dtype=str),
         "annotation": pd.read_csv(paths.annotation, dtype=str),
     }
@@ -155,58 +134,10 @@ def verify_same_cells(paths: PipelinePaths) -> dict[str, pd.DataFrame]:
     return {name: frame.set_index("cell_barcode") for name, frame in sources.items()}
 
 
-# --- Step 2: what the Stage 06 rebuild changed --------------------------------------
-# scGPT-Raw is clustered without Harmony and should be untouched by the rebuild, so it
-# must match exactly. scGPT-Harmony is expected to move for a small share of cells; what
-# the downstream annotation needs is that cluster N still means cluster N.
-def compare_old_and_new_clusters(
-    sources: dict[str, pd.DataFrame], paths: PipelinePaths
-) -> dict[str, object]:
-    """Assert scgpt_raw is unchanged and scgpt_harmony kept its cluster identities."""
-
-    new = sources["new_clusters"]
-    old = sources["old_clusters"].loc[new.index]
-
-    if not (new["scgpt_raw"] == old["scgpt_raw"]).all():
-        changed = int((new["scgpt_raw"] != old["scgpt_raw"]).sum())
-        raise ValueError(f"scgpt_raw differs between old and new Stage 06 in {changed} cells")
-    print("scgpt_raw is identical per barcode between the old and rebuilt Stage 06.")
-
-    crosstab = pd.crosstab(old["scgpt_harmony"], new["scgpt_harmony"])
-    crosstab.index = [f"old_{c}" for c in crosstab.index]
-    crosstab.columns = [f"new_{c}" for c in crosstab.columns]
-    crosstab.to_csv(paths.output_dir / "scgpt_harmony_old_vs_new_crosstab.csv")
-
-    pct_identical = 100 * float((new["scgpt_harmony"] == old["scgpt_harmony"]).mean())
-    majority_new: dict[str, str] = {}
-    for old_cluster in sorted(old["scgpt_harmony"].unique(), key=int):
-        landed = new.loc[old["scgpt_harmony"] == old_cluster, "scgpt_harmony"].value_counts()
-        majority_new[old_cluster] = str(landed.index[0])
-        if majority_new[old_cluster] != old_cluster:
-            raise ValueError(
-                f"Old scgpt_harmony cluster {old_cluster} mostly landed in new cluster "
-                f"{majority_new[old_cluster]}; the cluster numbers no longer correspond"
-            )
-    print(
-        f"scgpt_harmony: {pct_identical:.2f}% of cells keep their cluster; every old "
-        "cluster's majority lands in the same-numbered new cluster."
-    )
-    print(crosstab.to_string())
-    return {
-        "scgpt_raw_identical": True,
-        "scgpt_harmony_pct_identical": pct_identical,
-        "scgpt_harmony_n_changed": int((new["scgpt_harmony"] != old["scgpt_harmony"]).sum()),
-        "scgpt_harmony_majority_lands_in_same_numbered_cluster": True,
-        "n_clusters_old": int(old["scgpt_harmony"].nunique()),
-        "n_clusters_new": int(new["scgpt_harmony"].nunique()),
-    }
-
-
-# --- Step 3: choose how many cores to take ---------------------------------------------
-# The PCA rebuild is still running in the main tree and its load comes in bursts, so the
-# busier of the 1- and 5-minute load averages is used: the 1-minute figure alone can catch
-# a lull. Free cores are the machine's 16 minus the whole cores busy; one more is left
-# spare for the other session.
+# --- Step 2: choose how many cores to take ---------------------------------------------
+# Other work on this machine comes in bursts, so the busier of the 1- and 5-minute load
+# averages is used: the 1-minute figure alone can catch a lull. Free cores are the
+# machine's 16 minus the whole cores busy, with one left spare.
 def choose_workers() -> tuple[int, tuple[float, float]]:
     """Return (workers, (load_1min, load_5min)) using the load at launch."""
 
@@ -265,7 +196,6 @@ def run_r(paths: PipelinePaths, workers: int, rscript: str | None = None) -> dic
         str(paths.clusters),
         str(paths.donor_leakage),
         str(paths.singler),
-        str(paths.old_stage15),
         str(paths.annotation),
         str(paths.output_dir),
         str(workers),
@@ -277,12 +207,11 @@ def run_r(paths: PipelinePaths, workers: int, rscript: str | None = None) -> dic
     expected = [
         "nmi_by_arm.csv",
         "annotation_vs_singler_agreement.csv",
-        "agreement_per_type_pca_harmony.csv",
-        "agreement_per_type_scgpt_harmony.csv",
-        "confusion_pca_harmony.csv",
-        "confusion_scgpt_harmony.csv",
-        "confusion_merged_myeloid_pca_harmony.csv",
-        "confusion_merged_myeloid_scgpt_harmony.csv",
+        *[
+            f"{table}_{arm}.csv"
+            for arm in ARMS
+            for table in ("agreement_per_type", "confusion", "confusion_merged_myeloid")
+        ],
         "myeloid_merge_table.csv",
         "monocyte_dc_marker_groups.csv",
         "confidence_by_broad_label.csv",
@@ -295,10 +224,8 @@ def run_r(paths: PipelinePaths, workers: int, rscript: str | None = None) -> dic
         paths.figure_dir / name
         for name in (
             "17_patient_vs_biology_scatter.png",
-            "17_agreement_heatmap_pca_harmony.png",
-            "17_agreement_heatmap_scgpt_harmony.png",
-            "17_umap_singler_vs_annotation_pca_harmony.png",
-            "17_umap_singler_vs_annotation_scgpt_harmony.png",
+            *[f"17_agreement_heatmap_{arm}.png" for arm in ARMS],
+            *[f"17_umap_singler_vs_annotation_{arm}.png" for arm in ARMS],
         )
     )
     return json.loads((paths.output_dir / "stage17_audit_r.json").read_text(encoding="utf-8"))
@@ -326,7 +253,6 @@ def main() -> None:
 
     sources = verify_same_cells(paths)
     paths.create_directories()
-    cluster_checks = compare_old_and_new_clusters(sources, paths)
     if args.verify_only:
         print("\nVerification complete; stopping before the analysis as requested.")
         return
@@ -343,13 +269,10 @@ def main() -> None:
             "clusters": str(paths.clusters),
             "donor_leakage": str(paths.donor_leakage),
             "singler_labels": str(paths.singler),
-            "old_stage06_clusters": str(paths.old_clusters),
-            "old_stage15_labels": str(paths.old_stage15),
             "seurat_input": str(paths.seurat_input_dir),
             "stage15_annotation": str(paths.annotation),
         },
         "same_cells_in_every_input": EXPECTED_CELLS,
-        "old_vs_new_stage06": cluster_checks,
         "workers": workers,
         "load_average_at_launch": {"1min": load[0], "5min": load[1]},
         "r_packages": versions,

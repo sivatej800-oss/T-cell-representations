@@ -41,15 +41,22 @@ figure_dir <- args[6]
 expected_cells <- 70391
 expected_genes <- 19689
 
-partitions <- c("pca15_harmony_cluster", "scgpt_harmony_cluster")
+partitions <- c("authors_pipeline_cluster", "scgpt_raw_cluster",
+                "pca15_harmony_cluster", "scgpt_harmony_cluster")
 partition_labels <- c(
+  authors_pipeline_cluster = "Authors' pipeline (Stage 03)",
+  scgpt_raw_cluster = "scGPT, uncorrected",
   pca15_harmony_cluster = "PCA-15 Harmony",
   scgpt_harmony_cluster = "scGPT Harmony"
 )
-# Which Stage 06 UMAP belongs to which partition. Each arm is drawn in its own layout,
-# because a partition plotted over the other arm's coordinates would look incoherent
-# for reasons that have nothing to do with the biology.
+# Which UMAP belongs to which partition. Each arm is drawn in its own layout, because a
+# partition plotted over the other arm's coordinates would look incoherent for reasons
+# that have nothing to do with the biology. The Harmony layouts are Stage 06's. The
+# authors' pipeline is drawn on Stage 03's own UMAP (integrated PCs 1-15, as they drew
+# it), and uncorrected scGPT on Stage 04's UMAP of the same 512-dimension embedding.
 umap_prefix <- c(
+  authors_pipeline_cluster = "authors_pipeline",
+  scgpt_raw_cluster = "scgpt_raw",
   pca15_harmony_cluster = "pca_harmony",
   scgpt_harmony_cluster = "scgpt_harmony"
 )
@@ -134,18 +141,30 @@ if (length(missing_panel) > 0) {
 }
 
 # --- Step 2: attach each arm's UMAP, so FeaturePlot has a layout to draw on -------
-# The coordinates come from Stage 06, which computed them on the corrected
-# representation each arm is defined by. They are read, not recomputed.
-message("Attaching Stage 06 UMAP layouts...")
-layouts <- utils::read.csv(
-  file.path(benchmark_dir, "benchmark_cluster_assignments.csv.gz"),
-  stringsAsFactors = FALSE
-)
-rownames(layouts) <- layouts$cell_barcode
-if (!setequal(layouts$cell_barcode, barcodes)) {
-  stop("Stage 06's layouts do not describe the same cells as the expression")
+# The coordinates are read, not recomputed, from the stage that computed them on the
+# representation each arm is defined by. Each file is joined by barcode.
+message("Attaching UMAP layouts...")
+read_layout <- function(path, columns, prefix) {
+  table <- utils::read.csv(path, stringsAsFactors = FALSE)
+  if (!setequal(table$cell_barcode, barcodes)) {
+    stop(basename(path), " does not describe the same cells as the expression")
+  }
+  rownames(table) <- table$cell_barcode
+  table <- table[barcodes, columns, drop = FALSE]
+  colnames(table) <- paste0(prefix, c("_UMAP_1", "_UMAP_2"))
+  table
 }
-layouts <- layouts[barcodes, , drop = FALSE]
+results_dir <- dirname(benchmark_dir)
+layouts <- cbind(
+  read_layout(file.path(benchmark_dir, "benchmark_cluster_assignments.csv.gz"),
+              c("pca_harmony_UMAP_1", "pca_harmony_UMAP_2"), "pca_harmony"),
+  read_layout(file.path(benchmark_dir, "benchmark_cluster_assignments.csv.gz"),
+              c("scgpt_harmony_UMAP_1", "scgpt_harmony_UMAP_2"), "scgpt_harmony"),
+  read_layout(file.path(results_dir, "03_seurat_reproduction", "GSE200164_umap_clusters.csv.gz"),
+              c("UMAP_1", "UMAP_2"), "authors_pipeline"),
+  read_layout(file.path(results_dir, "04_scgpt_embedding", "GSE200164_scgpt_umap_clusters.csv.gz"),
+              c("UMAP_1", "UMAP_2"), "scgpt_raw")
+)
 
 for (partition in partitions) {
   prefix <- umap_prefix[[partition]]
