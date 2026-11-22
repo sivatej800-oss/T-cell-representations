@@ -36,8 +36,6 @@ renv/cache/
 logs/
 
 # Raw and derived single-cell data
-Age_trajectory/*
-!Age_trajectory/README.md
 *.h5ad
 *.h5
 *.hdf5
@@ -73,3 +71,16 @@ mlruns/
 # 03_RESULTS is a navigation layer of READMEs and relative symlinks into
 # Age_trajectory/results/; track the links even where their names match patterns above.
 !03_RESULTS/**
+
+# Age_trajectory/ is the generated pipeline workspace, so everything in it is ignored
+# except what is deliberately tracked: its README, results/README.md, and the figures
+# (the 03_RESULTS/ symlinks resolve on GitHub because of them). Git cannot re-include
+# a file inside an excluded directory, so each level is excluded with `/*` and its
+# tracked child re-included. This block sits after the generic `results/` rule above
+# so that it can override it.
+Age_trajectory/*
+!Age_trajectory/README.md
+!Age_trajectory/results/
+Age_trajectory/results/*
+!Age_trajectory/results/README.md
+!Age_trajectory/results/figures/

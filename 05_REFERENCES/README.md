@@ -15,5 +15,6 @@ analyses outside this project. Its core parameters are already built into
 `02_CODE/03_reproduce_figure1d.R`. The authors' upstream preprocessing is already
 applied to the public GEO matrix.
 
-The scGPT source code, which is also reference material, stays at
-`archive/vendor/scGPT-main/` because Stage 05 reads its gene vocabulary from that path.
+The scGPT gene vocabulary, `scgpt_vocab/default_census_vocab.json` (with its license
+and provenance README), is the one file here that the pipeline reads: Stage 05 audits
+gene coverage against it.

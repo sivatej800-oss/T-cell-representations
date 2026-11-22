@@ -68,9 +68,10 @@ state preceded them. Because the script resumes from checkpoints, that state dep
 on how much of the run was recomputed. The `set.seed` calls before those steps are
 what make a resumed run and a fresh run agree; they are not redundant.
 
-**The three stages repeat their path and validation helpers on purpose.** They import
-nothing from each other, so each file can be read and run on its own. This trades some
-duplication for the ability to understand one stage without tracing across files.
+**The stages repeat their path and validation helpers on purpose.** The pipeline has
+15 stages and they import nothing from each other, so each file can be read and run on
+its own. This trades some duplication for the ability to understand one stage without
+tracing across files.
 Factoring the shared parts into a module would be the conventional move; it is not
 wanted here.
 
@@ -79,7 +80,7 @@ wanted here.
 - Python: `.venv/` in this directory. Note `~/.venvs/jupyter` also exists and is the
   notebook kernel — not the pipeline environment.
 - R: system install, packages under `~/R`. Seurat 5.5.1.
-- Disk is tight (~38 GB free of 99 GB). The workspace is already ~47 GB, and a
+- Disk is tight (~39 GB free of 99 GB). The workspace is already ~39 GB, and a
   from-scratch run needs 60–80 GB free. Do not delete anything under
   `Age_trajectory/` without asking.
 
@@ -91,7 +92,7 @@ python 02_CODE/02_prepare_figure1d.py
 python 02_CODE/03_reproduce_figure1d.py
 ```
 
-Stages 04 and 05 are the scGPT comparison arm and are independent of the three above.
+Stages 04 and 05 are the scGPT comparison arm and are independent of the three above (Stages 06–15 are listed in `03_RESULTS/README.md`).
 Stage 04 needs the unpacked embedding bundle in `Age_trajectory/data/scgpt/` and Stage
 03's `seurat_input/` to check the two arms describe the same cells; Stage 05 reads
 finished artifacts only and can be run at any time.
@@ -101,7 +102,7 @@ python 02_CODE/04_scgpt_figure1d.py
 python 02_CODE/05_audit_scgpt_gene_coverage.py
 ```
 
-All three must share a workspace (default `Age_trajectory/`). Every stage resumes
+All stages must share a workspace (default `Age_trajectory/`). Every stage resumes
 from saved work, so re-running after an interruption is cheap.
 
 To redo part of Stage 03, use `--restart-from {none,clustering,pca,integration,all}`
@@ -119,14 +120,13 @@ SCTransform runs and costs hours.
   into `Age_trajectory/results/`. Never copy results here; add links.
 - `04_PAPER/` — outline and abstract.
 - `05_REFERENCES/` — the paper, its published figure, and the authors' own code
-  (`author_code/figure1d_author_workflow.R`). Reference only.
+  (`author_code/figure1d_author_workflow.R`). Reference only, except
+  `scgpt_vocab/default_census_vocab.json`, the gene vocabulary Stage 05 audits against.
 - `Age_trajectory/` — the pipeline workspace: generated output, resumable,
   git-ignored. Its `results/NN_*` stage directory names are read by the scripts and
   must not be renamed.
-- `ARCHIVE/` — superseded human-facing material. `archive/` (lowercase) holds old
-  notebooks and a vendored scGPT source snapshot; it stays put because
-  `archive/vendor/scGPT-main/scgpt/tokenizer/default_census_vocab.json` is the gene
-  vocabulary Stage 05 audits against.
+- `ARCHIVE/` — superseded work: old notebooks, analysis logs, a legacy data README.
+  Nothing in the pipeline reads it.
 
 ## Before committing
 

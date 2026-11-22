@@ -1,6 +1,6 @@
 # Status
 
-*Last updated 2026-09-27.*
+*Last updated 2026-11-22.*
 
 ## Research question
 
@@ -51,7 +51,8 @@ meaning T-cell and monocyte subtypes, is still untested.
    See [10_MONOCYTE_SUBCLUSTERS](../03_RESULTS/10_MONOCYTE_SUBCLUSTERS/).
 3. Write the refined labels back onto the full UMAP to produce Figure 1D itself.
 4. Pick the figures for [FINAL_FIGURES](../03_RESULTS/FINAL_FIGURES/) and draft the
-   [paper](../04_PAPER/).
+   [paper](../04_PAPER/). A paper outline and abstract already exist in
+   [`04_PAPER/`](../04_PAPER/).
 
 ## Project scope
 
