@@ -43,8 +43,10 @@ are in `Age_trajectory/results_superseded_2026-11-22/`.
   0.220 in scGPT space against PCA labels' 0.100. At matched 512 dimensions it is the
   same: PCA-512 labels 0.053 against −0.022 in PCA-512 space, scGPT labels 0.221
   against 0.136 in scGPT space. Neither description wins in both spaces.
-- **Biology:** pending. Broad annotation (Stage 15) is being redone for the rebuilt PCA
-  arm.
+- **Biology:** both arms resolve to the same broad cell types (T, monocyte, DC, NK,
+  B), within 119 cells for every identity. 821 PCA cells (875 in scGPT) are
+  Undetermined: a cluster dominated by XIST and long-transcript genes. PCA cluster 3
+  is macrophage-like and filed under Monocytes.
 
 ## Current interpretation
 

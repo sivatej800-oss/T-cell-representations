@@ -29,12 +29,11 @@ as possible (SCT residuals, the quantity their integration consumes). On that fo
 neither representation wins on geometry: each partition scores best in its own space
 (PCA 0.176 in PCA space, scGPT 0.220 in scGPT space), and that holds at matched 512
 dimensions. After Harmony PCA mixes donors better locally (0.969 against 0.866), with
-lower donor NMI (0.038 against 0.051). Biological agreement is being redone for the
-rebuilt PCA arm.
+lower donor NMI (0.038 against 0.051). Both arms recover the same broad cell types,
+within 119 cells for every identity.
 
 **What remains unknown.** Whether the arms differ in biology at finer resolution:
-T-cell and monocyte subtypes. The broad annotation (Stage 15) is pending for the
-rebuilt PCA arm.
+T-cell and monocyte subtypes.
 
 **Immediate next step.** Recluster the T cells, then the monocytes, in both arms, and
 compare the subtype annotations.
@@ -703,18 +702,80 @@ cells.
 
 Both arms were run through the same marker discovery and evidence stages on the
 rebuilt PCA arm. The evidence tables are in `Age_trajectory/results/14_marker_evidence/`.
-Reading them into cell types is Stage 15 and is pending (section 8).
+Reading them into cell types is Stage 15 (section 8).
 
 ---
 
 ## 8. Broad cell-type annotation
 
-**Pending.** The hand annotation (Stage 15) was done on the earlier PCA arm (13
-clusters, built from the SCT `data` layer) and on the earlier `scgpt_harmony` labels.
-Both partitions have since changed, so those assignments no longer apply and their
-counts are not reported here. Stage 15 will be rerun after the proposed assignments
-for the rebuilt PCA arm are approved. The earlier results are in
-`Age_trajectory/results_superseded_2026-11-22/`.
+```mermaid
+flowchart TD
+    A[("Stage 14 · cluster_evidence_table.csv<br/>feature plots + panel percentages")]
+    B["<b>a person reads the evidence</b><br/><i>one decision per cluster, typed in</i>"]
+
+    C["<b>PCA-15 Harmony</b> · 12 clusters<br/>T 0,1,2,4,10 · Mono 3,7<br/>DC 5,9 · NK 6 · B 11 · Undet. 8"]
+    D["<b>scGPT Harmony</b> · 11 clusters<br/>T 0,1,4,10 · Mono 2,6<br/>DC 3,8 · NK 5 · B 9 · Undet. 7"]
+
+    E{"every cluster assigned once,<br/>every label one of the seven?"}
+    F["<b>stop</b><br/><i>a mistyped cluster number would<br/>silently drop cells from the figure</i>"]
+
+    G["<b>identity column per arm</b><br/>joined to the frozen labels by barcode"]
+    H(["annotated_cluster_labels.csv.gz<br/>annotation_rationale.csv<br/>15_celltypes_*.png"])
+
+    A --> B
+    B --> C --> E
+    B --> D --> E
+    E -->|no| F
+    E -->|yes| G --> H
+
+    style C fill:#dbe8f5,stroke:#4a6a8a
+    style D fill:#f0dbe8,stroke:#8a4a6a
+    style F fill:#f5d5d5,stroke:#a05050
+    style H fill:#d4e8d4,stroke:#4a7a4a
+```
+
+### What was done
+
+Following the authors, each cluster was assigned by hand, from its evidence row and
+feature plots, to one of their seven broad categories. This is only the authors' first
+pass. Their finer labels come from reclustering, which has not been done yet. Cluster
+numbers mean nothing across arms, so each arm was read from its own plots. The
+assignments were made on the rebuilt PCA arm (SCT residuals) and the current
+`scgpt_harmony` labels; the earlier annotation is superseded.
+
+Two judgement calls:
+- **PCA cluster 3** (5,267 cells: APOE, C1Q genes, LYVE1; CD14 and CD68 high) is
+  macrophage-like. It is filed under Monocytes because the authors' categories have
+  nothing closer.
+- **PCA cluster 8** (821 cells) is dominated by XIST and long-transcript genes (SYNE2,
+  MACF1, UTRN), with no canonical lineage marker above 50%. It spans 58 patients, so it
+  is not one donor's cells. It is Undetermined, a category the authors also used. The
+  same cells form scGPT cluster 7 (85% of PCA cluster 8 lands there), which gets the
+  same label.
+
+**Code.** `02_CODE/15_annotate_clusters.R`.
+
+![Broad cell types over the PCA-15 Harmony UMAP](../Age_trajectory/results/figures/15_celltypes_pca15_harmony_cluster.png)
+
+![Broad cell types over the scGPT Harmony UMAP](../Age_trajectory/results/figures/15_celltypes_scgpt_harmony_cluster.png)
+
+| identity | PCA-15 Harmony | scGPT Harmony | difference |
+| --- | --- | --- | --- |
+| T Cells | 54,803 | 54,684 | 119 |
+| Monocytes | 7,387 | 7,470 | 83 |
+| DC | 4,794 | 4,849 | 55 |
+| NK Cells | 2,369 | 2,305 | 64 |
+| B Cells | 217 | 208 | 9 |
+| Undetermined | 821 | 875 | 54 |
+
+### Conclusion
+
+Both representations recover nearly identical broad immune populations, within 119
+cells for every identity. `Plasma Cells` went unused in both arms. PCA's one extra
+cluster is a subdivision *within* T cells (PCA cluster 10, cycling cells; scGPT's cycling
+cluster 10 holds only 12% of them, and 60% sit in scGPT's large T cluster 1). At this resolution the arms are biologically equivalent.
+Both labels rest on the same hand reading, so agreement here does not say which
+partition is better.
 
 ---
 
@@ -765,8 +826,8 @@ flowchart LR
   Harmony-corrected.
 - **Separation tested.** Silhouette at native width, the PCA-512 dimensionality
   control, and the WCSS sweep, all rerun on the rebuilt PCA arm.
-- **Markers.** Frozen partitions and RNA marker evidence for both arms. Broad
-  annotation is pending a rerun.
+- **Biology checked.** Frozen partitions, RNA marker validation, and broad cell-type
+  annotation for both arms, redone on the rebuilt PCA arm.
 
 ## Main conclusion so far
 
@@ -775,8 +836,8 @@ neither representation separates clusters better in both spaces: each partition 
 highest in its own, at native width and at matched 512 dimensions. After Harmony, PCA
 has the lower donor NMI (0.038 against 0.051) and mixes donors better locally (0.969
 against 0.866). An earlier claim that scGPT separates clusters better came from a PCA
-arm built on the wrong layer and is withdrawn. Whether the arms differ in biology awaits
-the Stage 15 annotation of the rebuilt arm.
+arm built on the wrong layer and is withdrawn. Both arms recover the same broad cell types, so
+whether they differ in biology awaits T-cell and monocyte subclustering.
 
 ## Next step
 
