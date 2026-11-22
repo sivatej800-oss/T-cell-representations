@@ -7,7 +7,7 @@ that with silhouette widths, computed on the clusters Stage 06 already produced.
 Nothing is re-clustered and no k is chosen: the Louvain partitions are the input.
 
 The comparison is not a matter of scoring each arm in its own space and reading off
-the larger number. Silhouette is built from distances, and 30 principal components
+the larger number. Silhouette is built from distances, and 15 principal components
 and 512 learned dimensions are not comparable — distances concentrate as dimension
 grows, which lowers silhouette for reasons unrelated to how good the grouping is. So
 each partition is scored in both spaces. Within one space the geometry is fixed and
@@ -36,7 +36,7 @@ import pandas as pd
 REQUIRED_R_PACKAGES = ("Seurat", "cluster", "ggplot2")
 
 # The two arms compared, named as Stage 06 named them.
-PCA_ARM = "pca_harmony_30dims"
+PCA_ARM = "pca_harmony"
 SCGPT_ARM = "scgpt_harmony"
 
 EXPECTED_CELLS = 70391

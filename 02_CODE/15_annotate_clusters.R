@@ -64,26 +64,35 @@ IDENTITY_COLOURS <- c(
 # Read off Stage 14's feature plots and panel tables. Each entry is a decision, not a
 # computation; the evidence for each is recorded in annotation_rationale.csv.
 
-# PCA-30 Harmony: 13 clusters
-pca30_annotation <- list(
-  "T Cells"      = c("0", "1", "2", "5", "8", "9", "12"),
+# PCA-15 Harmony: 12 clusters, built from SCT residuals. Cluster 3 (APOE, C1Q genes,
+# LYVE1, CD14 and CD68 high) is macrophage-like; it goes under Monocytes because the
+# authors' seven categories have nothing closer. Cluster 8 is dominated by XIST and
+# long-transcript genes (SYNE2, MACF1, UTRN) with no canonical lineage marker above
+# 50%; it spans 58 patients, so it is not one donor's cells, and the panel cannot
+# resolve it. The authors used Undetermined for exactly that case.
+pca15_annotation <- list(
+  "T Cells"      = c("0", "1", "2", "4", "10"),
   "Monocytes"    = c("3", "7"),
-  "DC"           = c("4", "10"),
+  "DC"           = c("5", "9"),
   "NK Cells"     = c("6"),
-  "B Cells"      = c("11")
+  "B Cells"      = c("11"),
+  "Undetermined" = c("8")
 )
 
-# scGPT Harmony: 11 clusters
+# scGPT Harmony: 11 clusters. Cluster 7 holds the same cells as PCA cluster 8 (85% of
+# that cluster lands here) with the same XIST and long-gene markers, so it gets the
+# same label.
 scgpt_annotation <- list(
-  "T Cells"      = c("0", "1", "4", "7", "10"),
+  "T Cells"      = c("0", "1", "4", "10"),
   "Monocytes"    = c("2", "6"),
   "DC"           = c("3", "8"),
   "NK Cells"     = c("5"),
-  "B Cells"      = c("9")
+  "B Cells"      = c("9"),
+  "Undetermined" = c("7")
 )
 
 annotations <- list(
-  pca30_harmony_cluster = pca30_annotation,
+  pca15_harmony_cluster = pca15_annotation,
   scgpt_harmony_cluster = scgpt_annotation
 )
 
@@ -181,9 +190,9 @@ placeholder <- Matrix::Matrix(0, nrow = 1, ncol = nrow(frozen), sparse = TRUE)
 rownames(placeholder) <- "placeholder"
 colnames(placeholder) <- frozen$cell_barcode
 csf <- CreateSeuratObject(counts = placeholder, assay = "RNA")
-umap_prefix <- c(pca30_harmony_cluster = "pca_harmony",
+umap_prefix <- c(pca15_harmony_cluster = "pca_harmony",
                  scgpt_harmony_cluster = "scgpt_harmony")
-partition_labels <- c(pca30_harmony_cluster = "PCA-30 Harmony",
+partition_labels <- c(pca15_harmony_cluster = "PCA-15 Harmony",
                       scgpt_harmony_cluster = "scGPT Harmony")
 
 for (partition in names(annotations)) {

@@ -1,22 +1,22 @@
 # 06 — Dimension control (PCA-512 against scGPT-512)
 
-**Question.** Is scGPT's silhouette advantage just a consequence of having 512
-dimensions instead of 30?
+**Question.** Is the silhouette comparison between PCA and scGPT just a consequence of
+the arms having different numbers of dimensions (15 against 512)?
 
-**Result: no.** Given the embedding's exact width, PCA gets worse rather than better:
+**Result.** At the embedding's exact width, each partition still scores best in its
+own space:
 
 | partition | scored in PCA-512 | scored in scGPT-512 |
 | --- | --- | --- |
-| PCA-512 labels (9 clusters) | **−0.033** | 0.160 |
-| scGPT labels (11 clusters) | −0.048 | **0.219** |
+| PCA-512 labels (8 clusters) | **0.053** | 0.136 |
+| scGPT labels (11 clusters) | −0.022 | **0.221** |
+| *PCA-15 labels (12, carried)* | *0.029* | *0.100* |
 
-PCA-512 is also a worse partition in its own right. It has 9 clusters with nothing
-below 378 cells, so the rare populations are lost. Five of its nine clusters score
-negative. All eleven scGPT clusters score positive, and the smallest ones score
-highest. PCs 31–512 hold 59.7% of the variance, spread across many near-noise
-directions, and that dilutes the signal that separates rare populations. Because
-PCA-512 has the coarser partition, the cluster-count bias favours PCA, and PCA still
-loses.
+The pattern matches native width, so dimensionality does not explain it. PCA-512 is a
+different partition from PCA-15: 8 clusters with the smallest at 76 cells, against 12
+and 217. Seven of its eight clusters score positive, and all eleven scGPT clusters do.
+PCs 16–512 hold 64.7% of the variance, spread across many near-noise directions. PCA-512
+has the coarser partition, so the cluster-count bias favours PCA, not scGPT.
 
 **Note.** The PCA-512 arm needs exact SVD (`approx = FALSE`). With the default method
 the decomposition fails to converge, and nothing downstream reports it.
@@ -29,7 +29,7 @@ the decomposition fails to converge, and nothing downstream reports it.
 
 | linked file | what it is |
 | --- | --- |
-| `10_pca512_harmony_umap.png` | PCA-512 UMAP, 9 clusters. |
+| `10_pca512_harmony_umap.png` | PCA-512 UMAP, 8 clusters. |
 | `11_silhouette_matched.png` | The matched 2×2. |
 | `11_silhouette_matched_per_cluster.png` | Per-cluster width for both partitions in their own spaces. |
 | `benchmark_pca512_summary.csv` | PCA-512 cluster counts and the variance split across components. |

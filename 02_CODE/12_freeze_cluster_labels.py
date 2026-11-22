@@ -41,14 +41,14 @@ import pandas as pd
 
 
 # --- What is being frozen ----------------------------------------------------
-# The two arms are named as Stage 06 named them. The PCA arm is the 30-dimension
-# one, matching Stages 07 and 11, which treat "PCA30" as the PCA comparator; the
-# 15-dimension arm exists to reproduce the paper, not to be compared against scGPT.
-PCA_ARM = "pca_harmony_30dims"
+# The two arms are named as Stage 06 named them. The PCA arm is the 15-dimension one,
+# the number the authors used, matching Stages 07 and 11. The 30-dimension arm stays
+# in Stage 06 only as a sensitivity check.
+PCA_ARM = "pca_harmony"
 SCGPT_ARM = "scgpt_harmony"
 
 # The names the frozen file uses, which are what later stages will refer to.
-FROZEN_NAMES = {PCA_ARM: "pca30_harmony_cluster", SCGPT_ARM: "scgpt_harmony_cluster"}
+FROZEN_NAMES = {PCA_ARM: "pca15_harmony_cluster", SCGPT_ARM: "scgpt_harmony_cluster"}
 
 EXPECTED_CELLS = 70391
 
@@ -98,7 +98,7 @@ def require_files(paths: Iterable[Path]) -> None:
 # the biological comparison, and taking exactly those two here is what makes the
 # freeze a decision rather than a copy.
 def load_partitions(paths: PipelinePaths) -> pd.DataFrame:
-    """Take the PCA-30 and scGPT partitions from Stage 06's assignment table."""
+    """Take the PCA-15 and scGPT partitions from Stage 06's assignment table."""
 
     assignments_file = paths.benchmark_dir / "benchmark_cluster_assignments.csv.gz"
     require_files([assignments_file])
@@ -177,7 +177,7 @@ def describe_partitions(frozen: pd.DataFrame) -> dict[str, object]:
 
     pca_column, scgpt_column = FROZEN_NAMES[PCA_ARM], FROZEN_NAMES[SCGPT_ARM]
     overlap = pd.crosstab(frozen[pca_column], frozen[scgpt_column])
-    print("\nCells shared between clusters (rows PCA-30, columns scGPT):")
+    print("\nCells shared between clusters (rows PCA-15, columns scGPT):")
     print(overlap.to_string())
     print(
         "\nCluster numbers are not comparable across arms. Louvain numbers by "

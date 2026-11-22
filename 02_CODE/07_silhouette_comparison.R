@@ -18,10 +18,10 @@
 #
 # The comparison this enables is not as simple as scoring each arm in its own space
 # and reading off the larger number. Silhouette is built from distances, and the two
-# spaces are not comparable: 30 principal components and 512 learned dimensions have
+# spaces are not comparable: 15 principal components and 512 learned dimensions have
 # different scales, and distances in high dimensions concentrate toward a common
 # value, which drags silhouette down for reasons that have nothing to do with the
-# quality of the grouping. Comparing 30-dimensional scores against 512-dimensional
+# quality of the grouping. Comparing 15-dimensional scores against 512-dimensional
 # ones would mostly measure the difference in dimension.
 #
 # So each partition is scored in both spaces, giving four numbers:
@@ -39,16 +39,16 @@
 # and says nothing about which is right.
 #
 # Comparisons run down a column only. Reading across one compares numbers computed in
-# different geometries, where 30 variance-ordered components and 512 learned
+# different geometries, where 15 variance-ordered components and 512 learned
 # dimensions produce distances that are not the same quantity.
 #
 # Two things this cannot answer. It does not say which clustering is biologically
 # correct: a tight, well-separated group of cells is not necessarily one cell type,
 # and two genuinely distinct types with similar expression will always score poorly.
 # That requires marker annotation, which does not exist for these cells. And it does
-# not account for the cluster counts, 13 against 11. Silhouette tends to reward
+# not account for the cluster counts, 12 against 11. Silhouette tends to reward
 # coarser partitions, because merging two adjacent groups removes the boundary cells
-# that scored badly, so some part of any advantage the 11-cluster arm shows may be
+# that scored badly, so some part of any advantage the coarser arm shows may be
 # the count rather than the separation. The partitions are scored exactly as Stage 06
 # produced them and that effect is left uncontrolled; it qualifies the numbers rather
 # than being removed from them.
@@ -75,7 +75,7 @@ suppressPackageStartupMessages({
 set.seed(random_seed)
 
 # The two arms being compared, named as Stage 06 named them.
-PCA_ARM <- "pca_harmony_30dims"
+PCA_ARM <- "pca_harmony"
 SCGPT_ARM <- "scgpt_harmony"
 # Repeats of the subsample. Silhouette needs every pairwise distance within the
 # sample, so the whole dataset is out of reach; drawing several times shows how much
@@ -103,7 +103,7 @@ for (column in c(PCA_ARM, SCGPT_ARM)) {
 # measured in, and they are the corrected ones, so donor differences have already
 # been removed from both.
 spaces <- list(
-  pca = Embeddings(object, reduction = "pca_harmony")[, 1:30, drop = FALSE],
+  pca = Embeddings(object, reduction = "pca_harmony")[, 1:15, drop = FALSE],
   scgpt = Embeddings(object, reduction = "scgpt_harmony")
 )
 # The coordinates are used exactly as the clustering used them, with no rescaling.
@@ -111,13 +111,10 @@ spaces <- list(
 # in anything else would score a partition in a geometry it was never formed in.
 #
 # Rescaling would also actively damage the PCA side. Principal components come out
-# ordered by how much variation each carries, and here the first spans about ten
-# times the spread of the thirtieth. Giving every component equal weight promotes the
-# trailing components, which are mostly noise, to the same footing as the leading
-# ones that carry the biology. Measured that way the PCA clusters score near zero
-# with more than half their cells apparently misassigned; measured on the components
-# as they are, the same clusters score fifteen times higher. The variance ordering is
-# the information, and flattening it destroys the thing being measured.
+# ordered by how much variation each carries. Giving every component equal weight
+# promotes the trailing components, which carry less signal, to the same footing as
+# the leading ones that carry the biology. The variance ordering is the information,
+# and flattening it destroys the thing being measured.
 #
 # A dimension that never varies contributes nothing to any distance, so it is dropped
 # rather than carried through every calculation.

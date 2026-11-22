@@ -37,7 +37,7 @@ import pandas as pd
 
 REQUIRED_R_PACKAGES = ("Seurat", "Matrix", "ggplot2", "patchwork", "jsonlite")
 
-PARTITIONS = ("pca30_harmony_cluster", "scgpt_harmony_cluster")
+PARTITIONS = ("pca15_harmony_cluster", "scgpt_harmony_cluster")
 
 # The paper's panel, in the paper's order. CD44 is included here and was not in the
 # 13-gene set Stage 13 scored, so Stage 14 recomputes the panel rather than reading

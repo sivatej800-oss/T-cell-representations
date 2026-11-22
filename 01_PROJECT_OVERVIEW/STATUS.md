@@ -25,23 +25,36 @@ Figure 1D.
 
 ## Headline results
 
+The PCA arm was rebuilt on 2026-11-22 from SCT residuals, the quantity the authors'
+integration consumes, so it follows their normalization as closely as a comparison
+without anchors allows. The earlier arm used the SCT `data` layer and was dominated by
+depth and gene count; every PCA number below is from the rebuilt arm. Earlier results
+are in `Age_trajectory/results_superseded_2026-11-22/`.
+
 - **Reproduction:** 12 clusters (the paper reports 13). Requesting the full
   integration-feature pool is what recovers the rare populations.
-- **Batch robustness:** before correction, scGPT leaked less patient identity than PCA
-  (donor NMI 0.072 against 0.167). Harmony brings both to 0.051.
-- **Separation:** at matched 512 dimensions, scGPT's partition scores 0.219 in its own
-  space and PCA-512's scores −0.033 in its own. All 11 scGPT clusters score positive,
-  against 4 of 9 for PCA-512. Adding dimensions to PCA loses the rare populations.
-- **Biology:** both arms resolve to the same five broad cell types (T, monocyte, DC,
-  NK, B), with counts within 83 cells of each other. PCA's two extra clusters are
-  subdivisions of T cells.
+- **Donor leakage:** the PCA arm *normalized per patient, no Harmony* has donor NMI
+  0.049 against scGPT's 0.072. That is not a like-for-like comparison: residuals are
+  centred within each patient, so the PCA arm is partly donor-adjusted. After Harmony,
+  donor NMI is 0.038 for PCA and 0.051 for scGPT, and PCA mixes donors better locally
+  (0.969 against 0.866).
+- **Separation:** each partition scores best in its own space. At native width, PCA
+  labels score 0.176 in PCA space against scGPT labels' 0.151, and scGPT labels score
+  0.220 in scGPT space against PCA labels' 0.100. At matched 512 dimensions it is the
+  same: PCA-512 labels 0.053 against −0.022 in PCA-512 space, scGPT labels 0.221
+  against 0.136 in scGPT space. Neither description wins in both spaces.
+- **Biology:** both arms resolve to the same broad cell types (T, monocyte, DC, NK,
+  B), within 119 cells for every identity. 821 PCA cells (875 in scGPT) are
+  Undetermined: a cluster dominated by XIST and long-transcript genes. PCA cluster 3
+  is macrophage-like and filed under Monocytes.
 
 ## Current interpretation
 
-At the broad cell-type level, PCA and scGPT agree on the biology. They differ in
-geometry: scGPT gives a better-separated, more batch-robust space, and that advantage
-is not an artifact of its dimensionality. Whether the arms differ in finer biology,
-meaning T-cell and monocyte subtypes, is still untested.
+With PCA built the way the authors normalized, the earlier claim that scGPT separates
+clusters better and is more batch-robust does not stand. The two descriptions give
+comparable geometry in their own spaces, and PCA is better at donor mixing after
+Harmony. Whether they differ in biology, at broad level or in T-cell and monocyte
+subtypes, is untested.
 
 ## Next analyses
 

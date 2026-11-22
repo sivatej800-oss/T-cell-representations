@@ -3,25 +3,25 @@
 # A PCA arm with the same number of dimensions as the embedding, to separate
 # representation from dimensionality.
 #
-# Stage 07 compared a 13-cluster PCA partition in 30 dimensions against an
+# Stage 07 compared a 12-cluster PCA partition in 15 dimensions against an
 # 11-cluster scGPT partition in 512, and found that every partition scores higher
 # in scGPT coordinates than in PCA coordinates — including the PCA partition
 # itself, which improved seventeenfold simply by being measured elsewhere. That
 # result has two candidate explanations and Stage 07 cannot separate them:
 #
 #   1. the embedding genuinely organizes these cells more cleanly, or
-#   2. silhouette behaves differently in 512 dimensions than in 30.
+#   2. silhouette behaves differently in 512 dimensions than in 15.
 #
 # Explanation 2 is not a minor worry. Distances in high dimensions concentrate
 # toward a common value, and silhouette is built entirely from distances, so the
-# number of dimensions moves the score on its own. Comparing 30 against 512 leaves
+# number of dimensions moves the score on its own. Comparing 15 against 512 leaves
 # representation and dimensionality varying together.
 #
 # This stage removes that confound the only way it can be removed: by building a
 # PCA arm at 512 dimensions and clustering it fresh, so the comparison against
 # scGPT holds dimensionality fixed and varies only the representation.
 #
-# The clustering is genuinely new. Reusing the 30-dimension labels and merely
+# The clustering is genuinely new. Reusing the 15-dimension labels and merely
 # re-scoring them would answer a different question — how the same partition
 # behaves in a larger space — and would not produce the PCA-512 partition this
 # comparison needs. Everything downstream of the decomposition matches Stage 06
@@ -31,7 +31,7 @@
 # real structure, so the trailing components are close to noise. That is a true
 # property of PCA at this width rather than a flaw in the setup, and it is the
 # honest answer to "what does PCA look like at 512 dimensions". The variance
-# actually carried past component 30 is reported so the result can be read with it.
+# actually carried past component 15 is reported so the result can be read with it.
 #
 # This script is started by 10_pca512_arm.py and is not run directly.
 
@@ -65,9 +65,10 @@ if (file.exists(checkpoint)) {
   message("Resuming from ", checkpoint)
   reference <- readRDS(checkpoint)
 } else {
-  # The uncorrected checkpoint carries the merged, scaled expression Stage 06 built:
-  # 59 samples SCTransformed separately then merged without anchors, so the only
-  # donor correction applied anywhere is the Harmony below.
+  # The uncorrected checkpoint carries the merged SCT residuals Stage 06 built in
+  # its scale.data layer: 59 samples SCTransformed separately, residuals stacked
+  # without anchors and not rescaled, so the only donor correction beyond each
+  # sample's own centring is the Harmony below.
   message("Reading Stage 06 uncorrected checkpoint...")
   reference <- readRDS(file.path(benchmark_dir, "benchmark_pca_uncorrected.rds"))
   if (ncol(reference) != expected_cells) {
@@ -138,11 +139,11 @@ if (ncol(embeddings) != n_dims || nrow(embeddings) != expected_cells) {
 # noise, and it qualifies every score computed downstream.
 variation <- apply(embeddings, 2, var)
 total_variation <- sum(variation)
-share_first_30 <- sum(variation[1:30]) / total_variation
-share_past_30 <- sum(variation[31:n_dims]) / total_variation
+share_first_15 <- sum(variation[1:15]) / total_variation
+share_past_15 <- sum(variation[16:n_dims]) / total_variation
 message(
-  "Variance captured: PCs 1-30 hold ", round(100 * share_first_30, 2),
-  "%, PCs 31-", n_dims, " hold ", round(100 * share_past_30, 2), "%"
+  "Variance captured: PCs 1-15 hold ", round(100 * share_first_15, 2),
+  "%, PCs 16-", n_dims, " hold ", round(100 * share_past_15, 2), "%"
 )
 # A component with no variation at all contributes nothing to any distance and
 # indicates the decomposition ran past the rank of the data.
@@ -232,8 +233,8 @@ summary_table <- data.frame(
   n_clusters = length(sizes),
   smallest_cluster = min(sizes),
   largest_cluster = max(sizes),
-  variance_share_first_30 = share_first_30,
-  variance_share_past_30 = share_past_30,
+  variance_share_first_15 = share_first_15,
+  variance_share_past_15 = share_past_15,
   stringsAsFactors = FALSE
 )
 write.csv(

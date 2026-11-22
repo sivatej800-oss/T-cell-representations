@@ -12,7 +12,7 @@
 # dimensions concentrate toward a common value, which changes every score built
 # from them.
 #
-# Stage 07 cannot separate those readings, because 30 against 512 varies
+# Stage 07 cannot separate those readings, because 15 against 512 varies
 # representation and dimensionality together. This stage separates them by scoring
 # PCA-512 against scGPT-512, where the only remaining difference is how the
 # coordinates were produced.
@@ -28,7 +28,7 @@
 # labels form tighter groups" is well-posed. What is new is that reading across a
 # row is no longer meaningless, because the two geometries now share a dimension.
 #
-# The PCA-30 partition is carried along as a third set of labels, scored in both
+# The PCA-15 partition is carried along as a third set of labels, scored in both
 # 512-dimensional spaces. It is not part of the matched comparison; it is there to
 # show what changes when only the dimensionality of the scoring space changes and
 # the labels stay the same.
@@ -60,7 +60,7 @@ suppressPackageStartupMessages({
 set.seed(random_seed)
 
 N_REPEATS <- 5
-PCA30_ARM <- "pca_harmony_30dims"
+PCA_ARM <- "pca_harmony"
 SCGPT_ARM <- "scgpt_harmony"
 
 
@@ -130,7 +130,7 @@ if (ncol(spaces$pca512) != ncol(spaces$scgpt)) {
 partitions <- list(
   pca512_labels = as.factor(pca512_assignments$pca512_harmony),
   scgpt_labels = as.factor(assignments[[SCGPT_ARM]]),
-  pca30_labels = as.factor(assignments[[PCA30_ARM]])
+  pca15_labels = as.factor(assignments[[PCA_ARM]])
 )
 for (name in names(partitions)) {
   message("Partition ", name, ": ", nlevels(partitions[[name]]), " clusters")
@@ -217,7 +217,7 @@ combinations <- expand.grid(
 native_space <- c(
   pca512_labels = "pca512",
   scgpt_labels = "scgpt",
-  pca30_labels = NA_character_
+  pca15_labels = NA_character_
 )
 
 results <- list()
@@ -235,7 +235,7 @@ for (row in seq_len(nrow(combinations))) {
   results[[row]] <- data.frame(
     partition = partition_name,
     space = space_name,
-    # The PCA-30 labels have no native space here; both 512-dimensional spaces are
+    # The PCA-15 labels have no native space here; both 512-dimensional spaces are
     # foreign to them, which is the point of carrying them along.
     is_native = identical(native_space[[partition_name]], space_name),
     is_matched = partition_name %in% c("pca512_labels", "scgpt_labels"),

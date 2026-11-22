@@ -12,7 +12,7 @@ Compactness is the within-cluster sum of squared distances to each cluster centr
 divided by the total sum of squares about the representation's overall centroid. The
 complement of that ratio is the fraction of total dispersion the grouping explains.
 
-The two curves are computed in different spaces — 30 principal components against
+The two curves are computed in different spaces — 15 principal components against
 512 learned dimensions — so their heights are not directly comparable. What is
 comparable is how steeply each falls as clusters are added, which is a property of
 how structure is organized within a space rather than of the space's size.
@@ -41,7 +41,7 @@ REQUIRED_R_PACKAGES = ("Seurat", "ggplot2")
 # The two arms swept, and the Stage 06 columns whose cluster counts the sweep must
 # reproduce at resolution 0.3.
 REPRESENTATIONS = {
-    "pca_harmony_30dims": "pca_harmony_30dims",
+    "pca_harmony": "pca_harmony",
     "scgpt_harmony": "scgpt_harmony",
 }
 

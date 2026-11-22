@@ -4,15 +4,15 @@
 Stage 07 found that every partition scores higher in scGPT coordinates than in PCA
 coordinates, including the PCA partition itself. That has two readings — the
 embedding organizes these cells more cleanly, or silhouette simply behaves
-differently in 512 dimensions than in 30 — and Stage 07 cannot separate them,
+differently in 512 dimensions than in 15 — and Stage 07 cannot separate them,
 because its two spaces differ in dimension as well as in kind.
 
 This stage removes the confound by scoring PCA-512 against scGPT-512, where the
 only remaining difference is how the coordinates were produced. The PCA-512 labels
 come from Stage 10, which clustered that arm fresh rather than reusing the
-30-dimension labels.
+15-dimension labels.
 
-The PCA-30 labels are carried along as a third partition, scored in both
+The PCA-15 labels are carried along as a third partition, scored in both
 512-dimensional spaces. They are not part of the matched comparison; they show what
 changes when the scoring space grows and the labels stay put.
 
@@ -34,7 +34,7 @@ import pandas as pd
 
 REQUIRED_R_PACKAGES = ("Seurat", "cluster", "ggplot2")
 
-PCA30_ARM = "pca_harmony_30dims"
+PCA_ARM = "pca_harmony"
 PCA512_ARM = "pca512_harmony"
 SCGPT_ARM = "scgpt_harmony"
 
@@ -107,7 +107,7 @@ def verify_inputs(paths: PipelinePaths) -> pd.DataFrame:
     stage10 = pd.read_csv(stage10_assignments)
 
     for frame, name, arms in (
-        (stage06, "Stage 06", (PCA30_ARM, SCGPT_ARM)),
+        (stage06, "Stage 06", (PCA_ARM, SCGPT_ARM)),
         (stage10, "Stage 10", (PCA512_ARM,)),
     ):
         if len(frame) != EXPECTED_CELLS:
@@ -123,11 +123,11 @@ def verify_inputs(paths: PipelinePaths) -> pd.DataFrame:
             "Stage 06 and Stage 10 do not describe the same cells in the same order"
         )
 
-    merged = stage06[["cell_barcode", PCA30_ARM, SCGPT_ARM]].copy()
+    merged = stage06[["cell_barcode", PCA_ARM, SCGPT_ARM]].copy()
     merged[PCA512_ARM] = stage10[PCA512_ARM]
 
     print("Partitions to be scored:")
-    for arm in (PCA512_ARM, SCGPT_ARM, PCA30_ARM):
+    for arm in (PCA512_ARM, SCGPT_ARM, PCA_ARM):
         sizes = merged[arm].value_counts()
         print(
             f"  {arm}: {len(sizes)} clusters, "
@@ -145,7 +145,7 @@ def report_sampling_resolution(
 ) -> dict[str, dict[str, int]]:
     resolution = {}
     print(f"\nAt {sample_size} cells per draw:")
-    for arm in (PCA512_ARM, SCGPT_ARM, PCA30_ARM):
+    for arm in (PCA512_ARM, SCGPT_ARM, PCA_ARM):
         sizes = assignments[arm].value_counts()
         smallest = int(sizes.min())
         drawn = max(2, round(sample_size * smallest / len(assignments)))
@@ -250,7 +250,7 @@ def main() -> None:
         "sample_size": args.sample_size,
         "matched_dims": EXPECTED_DIMS,
         "arms_compared": [PCA512_ARM, SCGPT_ARM],
-        "arms_carried": [PCA30_ARM],
+        "arms_carried": [PCA_ARM],
         "r_packages": versions,
         "sampling_resolution": resolution,
     }

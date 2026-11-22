@@ -1,5 +1,10 @@
 # Paper outline
 
+> **STALE, 2026-11-22.** This draft was written before the PCA arm was rebuilt from SCT
+> residuals. Its PCA numbers and its claims that scGPT is more donor-robust and
+> separates clusters better come from the superseded arm and no longer stand; see
+> `01_PROJECT_OVERVIEW/STATUS.md`. It is to be rewritten.
+
 *Working outline. Numbers come from `01_PROJECT_OVERVIEW/ANALYSIS_WALKTHROUGH.md`.
 Items marked **PENDING** depend on the T-cell and monocyte subclustering, which has
 not been run.*
@@ -162,7 +167,7 @@ at subtype resolution.
 
 **Fig. 3A.** Canonical markers over the PCA-Harmony UMAP
 
-![Fig. 3A: Canonical markers over the PCA-Harmony UMAP](../Age_trajectory/results/figures/14_featureplots_pca30_harmony_cluster.png)
+![Fig. 3A: Canonical markers over the PCA-Harmony UMAP](../Age_trajectory/results/figures/14_featureplots_pca15_harmony_cluster.png)
 
 **Fig. 3B.** Canonical markers over the scGPT-Harmony UMAP
 
@@ -170,7 +175,7 @@ at subtype resolution.
 
 **Fig. 3C.** Broad cell types, PCA-Harmony
 
-![Fig. 3C: Broad cell types, PCA-Harmony](../Age_trajectory/results/figures/15_celltypes_pca30_harmony_cluster.png)
+![Fig. 3C: Broad cell types, PCA-Harmony](../Age_trajectory/results/figures/15_celltypes_pca15_harmony_cluster.png)
 
 **Fig. 3D.** Broad cell types, scGPT-Harmony
 
@@ -216,15 +221,15 @@ Links point to the canonical files in `Age_trajectory/results/figures/` (they op
 | **2B** | PCA-512 UMAP (9 clusters, rare populations lost) | [10_pca512_harmony_umap.png](../Age_trajectory/results/figures/10_pca512_harmony_umap.png) |
 | **2C** | Matched 512-vs-512 silhouette 2×2 | [11_silhouette_matched.png](../Age_trajectory/results/figures/11_silhouette_matched.png) |
 | **2D** | Matched per-cluster silhouette | [11_silhouette_matched_per_cluster.png](../Age_trajectory/results/figures/11_silhouette_matched_per_cluster.png) |
-| **3A** | Canonical marker panel over PCA-Harmony UMAP | [14_featureplots_pca30_harmony_cluster.png](../Age_trajectory/results/figures/14_featureplots_pca30_harmony_cluster.png) |
+| **3A** | Canonical marker panel over PCA-Harmony UMAP | [14_featureplots_pca15_harmony_cluster.png](../Age_trajectory/results/figures/14_featureplots_pca15_harmony_cluster.png) |
 | **3B** | Canonical marker panel over scGPT-Harmony UMAP | [14_featureplots_scgpt_harmony_cluster.png](../Age_trajectory/results/figures/14_featureplots_scgpt_harmony_cluster.png) |
-| **3C** | Broad cell types, PCA-Harmony | [15_celltypes_pca30_harmony_cluster.png](../Age_trajectory/results/figures/15_celltypes_pca30_harmony_cluster.png) |
+| **3C** | Broad cell types, PCA-Harmony | [15_celltypes_pca15_harmony_cluster.png](../Age_trajectory/results/figures/15_celltypes_pca15_harmony_cluster.png) |
 | **3D** | Broad cell types, scGPT-Harmony | [15_celltypes_scgpt_harmony_cluster.png](../Age_trajectory/results/figures/15_celltypes_scgpt_harmony_cluster.png) |
 | **S1** | scGPT uncorrected UMAP (13 clusters) | [04_scgpt_raw_umap_clusters.png](../Age_trajectory/results/figures/04_scgpt_raw_umap_clusters.png) |
 | **S2A** | Uncorrected PCA UMAP (11 clusters) | [06_pca_raw_umap.png](../Age_trajectory/results/figures/06_pca_raw_umap.png) |
 | **S3A** | WCSS against cluster count | [08_wcss_compactness.png](../Age_trajectory/results/figures/08_wcss_compactness.png) |
 | **S3B** | Dispersion explained against cluster count | [08_wcss_dispersion_explained.png](../Age_trajectory/results/figures/08_wcss_dispersion_explained.png) |
-| **S4** | Cluster maps used alongside the marker panels | [14_clusters_scgpt_harmony_cluster.png](../Age_trajectory/results/figures/14_clusters_scgpt_harmony_cluster.png) · [14_clusters_pca30_harmony_cluster.png](../Age_trajectory/results/figures/14_clusters_pca30_harmony_cluster.png) |
+| **S4** | Cluster maps used alongside the marker panels | [14_clusters_scgpt_harmony_cluster.png](../Age_trajectory/results/figures/14_clusters_scgpt_harmony_cluster.png) · [14_clusters_pca15_harmony_cluster.png](../Age_trajectory/results/figures/14_clusters_pca15_harmony_cluster.png) |
 | **4A–B** | T-cell subclusters per arm | PENDING |
 | **4C–D** | Monocyte subclusters per arm | PENDING |
 
@@ -253,7 +258,7 @@ S3 WCSS sweep · S4 cluster maps.
 
 **Supp. Fig. S4A.** PCA-Harmony cluster map
 
-![Supp. Fig. S4A: PCA-Harmony cluster map](../Age_trajectory/results/figures/14_clusters_pca30_harmony_cluster.png)
+![Supp. Fig. S4A: PCA-Harmony cluster map](../Age_trajectory/results/figures/14_clusters_pca15_harmony_cluster.png)
 
 **Supp. Fig. S4B.** scGPT-Harmony cluster map
 

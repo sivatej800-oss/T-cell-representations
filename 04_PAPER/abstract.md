@@ -1,5 +1,10 @@
 # Abstract
 
+> **STALE, 2026-11-22.** This draft was written before the PCA arm was rebuilt from SCT
+> residuals. Its PCA numbers and its claims that scGPT is more donor-robust and
+> separates clusters better come from the superseded arm and no longer stand; see
+> `01_PROJECT_OVERVIEW/STATUS.md`. It is to be rewritten.
+
 *Draft. Bracketed text is a placeholder for the T-cell and monocyte subclustering,
 which has not been run. Word count excluding placeholders: ~260.*
 

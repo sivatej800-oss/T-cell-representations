@@ -18,12 +18,22 @@
 # dimensions are ordered by variance or independently meaningful, which is what makes
 # it valid on a learned embedding where neither holds.
 #
-# That gives a 2x2. Both descriptions appear corrected and uncorrected, so the effect
-# of the correction is visible separately from the effect of the description:
+# That gives a 2x2. Both descriptions appear with and without Harmony, so the effect
+# of the correction is visible separately from the effect of the description. The
+# arm without Harmony is named pca_raw / scgpt_raw in the files; for the PCA side
+# that means "normalized per patient, no Harmony", not raw, because each patient's
+# SCT residuals are centred within that patient and so already carry a partial
+# donor adjustment. The scGPT side has no such step.
 #
-#                    uncorrected          Harmony-corrected
-#   PCA 50 -> 15      pca_raw              pca_harmony
-#   scGPT 512         scgpt_raw            scgpt_harmony
+#   SCT residuals (merge) -> PCA 50 -> 15 dims
+#                          -> no Harmony         pca_raw
+#                          -> Harmony            pca_harmony
+#   scGPT 512              -> no Harmony         scgpt_raw
+#                          -> Harmony            scgpt_harmony
+#
+# The PCA arm follows the authors' normalization as closely as a comparison without
+# anchors allows: per-sample SCTransform with their settings, the integration
+# feature pool, and the residuals PrepSCTIntegration builds from them.
 #
 # A fifth arm clusters the corrected PCA on 30 dimensions instead of 15, to show
 # whether the conclusion depends on that cut. Everything downstream of the
@@ -42,11 +52,14 @@
 # arm performs explicitly is absorbed by the binning rather than omitted.
 #
 # The second is a real asymmetry that cannot be removed without retraining. The
-# per-sample normalization also regressed out mitochondrial fraction, so that
-# technical signal is gone from the PCA arm. Binning removes depth but not
+# per-sample SCTransform regressed nCount_RNA, nFeature_RNA and percent.mt out of
+# the 1,000 genes it chose as variable, and the other ~1,800 genes in the PCA input
+# are residuals from the fitted model without that regression (the same mix
+# PrepSCTIntegration passes to the authors' integration). Mitochondrial fraction is
+# therefore reduced in the PCA arm, not removed. Binning removes depth but not
 # mitochondrial content: a stressed cell keeps its mitochondrial genes ranked high
-# and the bins preserve it. The scGPT arm therefore still carries a technical
-# gradient the PCA arm does not.
+# and the bins preserve it. The scGPT arm therefore carries more of that technical
+# gradient than the PCA arm does, by an amount that has not been measured here.
 #
 # The third is the largest and is a limit on precision rather than a bias. scGPT
 # reads at most 1,200 genes per cell and samples them at random when a cell has more.
@@ -188,8 +201,23 @@ donor_mixing_score <- function(object, reduction, dims, donors) {
 # expression that anchor integration had already corrected, so they carry a batch
 # correction of a different kind and would make the PCA arm doubly corrected while
 # the scGPT arm is corrected once. This recomputes them from the same per-sample
-# normalizations Stage 03 starts from, merged but left uncorrected, which is the
+# SCTransform fits Stage 03 starts from, merged but left uncorrected, which is the
 # input Harmony expects.
+#
+# The values that go into the PCA are SCT Pearson residuals, built the way the
+# authors' PrepSCTIntegration builds them. That is the quantity their integration
+# consumes (05_REFERENCES/author_code/figure1d_author_workflow.R, lines 67-68), so
+# this arm follows their normalization as closely as a comparison without anchors
+# allows. An earlier version of this stage used the SCT "data" layer, log-scale
+# corrected counts the authors' workflow never touches, and the whole PCA arm came
+# out dominated by sequencing depth and gene count instead of cell type.
+#
+# GetResidual keeps each sample's stored scale.data for the 1,000 genes SCTransform
+# chose as variable, which were regressed on nCount_RNA, nFeature_RNA and percent.mt,
+# and computes the remaining requested genes from the fitted model without that
+# regression. That mix is exactly what PrepSCTIntegration hands to the anchor step.
+# No ScaleData call follows: SCT residuals are already variance-stabilized, and
+# rescaling them is not something the authors' integration does.
 #
 # The gene set is chosen exactly as Stage 03 chooses it, so that the two arms differ
 # in how batch is handled and in nothing else. Requesting 3,000 returns the whole
@@ -229,42 +257,89 @@ if (file.exists(pca_checkpoint)) {
     stop("Too few shared features to describe cell types: ", length(features))
   }
 
-  # Assemble the normalized values into one matrix. The samples are stacked as they
-  # are, with no adjustment between them: leaving the donor differences in place is
-  # what gives Harmony something to remove, and what makes the uncorrected arm a
-  # genuine control rather than a partially corrected one.
-  message("Assembling merged expression matrix...")
-  expression <- do.call(cbind, lapply(sample_names, function(sample_name) {
-    GetAssayData(sct_list[[sample_name]], assay = "SCT", layer = "data")[features, ]
-  }))
+  # Residuals for every shared gene, one sample at a time. Each sample's residuals
+  # come from that sample's own model, so they are centred within the patient: a
+  # gene's typical level in each patient is already near zero. That is a partial
+  # donor adjustment built into the normalization, which is why the uncorrected arm
+  # below is "normalized per patient, no Harmony" rather than raw.
+  message("Computing SCT residuals per sample...")
+  barcodes_file <- file.path(dirname(sct_dir), "seurat_input", "barcodes.tsv")
+  stage03_barcodes <- scan(barcodes_file, what = character(), quiet = TRUE)
+  residual_list <- lapply(sample_names, function(sample_name) {
+    sample_object <- sct_list[[sample_name]]
+    residuals <- GetAssayData(
+      GetResidual(sample_object, features = features, verbose = FALSE),
+      assay = "SCT",
+      layer = "scale.data"
+    )[features, ]
+    residuals <- as.matrix(residuals)
+
+    # A mistake here would still cluster and still draw a plausible figure, so each
+    # sample is checked: every gene present and finite, cells in the object's own
+    # order, and the genes SCTransform stored itself untouched by the rebuild.
+    if (nrow(residuals) != length(features) || !identical(rownames(residuals), features)) {
+      stop("Residuals for ", sample_name, " do not cover every requested gene")
+    }
+    if (anyNA(residuals)) {
+      stop("Residuals for ", sample_name, " contain missing values")
+    }
+    if (!identical(colnames(residuals), colnames(sample_object))) {
+      stop("Residual cells for ", sample_name, " are not in the sample's cell order")
+    }
+    stored <- as.matrix(GetAssayData(sample_object, assay = "SCT", layer = "scale.data"))
+    stored_genes <- intersect(rownames(stored), features)
+    if (length(stored_genes) == 0) {
+      stop("No stored scale.data genes to verify against for ", sample_name)
+    }
+    if (any(residuals[stored_genes, ] != stored[stored_genes, colnames(residuals)])) {
+      stop("Residuals for ", sample_name, " differ from its stored scale.data")
+    }
+    residuals
+  })
+  names(residual_list) <- sample_names
   cell_donors <- rep(sample_names, vapply(sct_list, ncol, numeric(1))[sample_names])
+  sample_cells <- unlist(lapply(sct_list[sample_names], colnames), use.names = FALSE)
   rm(sct_list)
   gc()
-  if (ncol(expression) != expected_cells) {
-    stop("Merged matrix holds ", ncol(expression), " cells, expected ", expected_cells)
+
+  # The samples are stacked as they are, with no adjustment between them beyond the
+  # within-patient centring above. The patient differences that remain are what give
+  # Harmony something to remove.
+  message("Assembling merged residual matrix...")
+  residuals <- do.call(cbind, residual_list)
+  rm(residual_list)
+  gc()
+  if (ncol(residuals) != expected_cells) {
+    stop("Merged matrix holds ", ncol(residuals), " cells, expected ", expected_cells)
+  }
+  if (!identical(colnames(residuals), sample_cells) || !setequal(sample_cells, stage03_barcodes)) {
+    stop("Merged residual cells do not match the cells and order of the samples")
   }
 
+  # The residuals sit in scale.data, which is where RunPCA reads, so nothing is
+  # rescaled between here and the decomposition. The counts layer is an empty
+  # placeholder: this object exists to carry the residuals and the reductions.
   reference <- CreateSeuratObject(
-    counts = expression,
+    counts = Matrix::sparseMatrix(
+      i = integer(0), j = integer(0), x = numeric(0),
+      dims = dim(residuals), dimnames = dimnames(residuals)
+    ),
     assay = "SCTmerged",
     meta.data = data.frame(
       internal_sample_id = cell_donors,
-      row.names = colnames(expression)
+      row.names = colnames(residuals)
     )
   )
-  reference <- SetAssayData(reference, assay = "SCTmerged", layer = "data", new.data = expression)
+  reference <- SetAssayData(reference, assay = "SCTmerged", layer = "scale.data", new.data = residuals)
   VariableFeatures(reference) <- features
-  rm(expression)
+  rm(residuals)
   gc()
 
-  # Centre and rescale each gene so that highly expressed genes do not dominate the
-  # decomposition purely through their magnitude, then condense to 50 dimensions.
   # Fifty is the field default and more than any arm uses; computing beyond what is
   # needed costs little and keeps the decomposition's approximation error out of the
   # comparison, since how many are requested slightly perturbs the leading ones.
-  message("Scaling and running PCA...")
+  message("Running PCA on SCT residuals...")
   set.seed(random_seed)
-  reference <- ScaleData(reference, features = features, verbose = FALSE)
   reference <- RunPCA(reference, features = features, npcs = 50, verbose = FALSE)
   saveRDS(reference, pca_checkpoint, compress = FALSE)
 }
