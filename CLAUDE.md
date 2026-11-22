@@ -80,7 +80,7 @@ wanted here.
 - Python: `.venv/` in this directory. Note `~/.venvs/jupyter` also exists and is the
   notebook kernel — not the pipeline environment.
 - R: system install, packages under `~/R`. Seurat 5.5.1.
-- Disk is tight (~38 GB free of 99 GB). The workspace is already ~63 GB, and a
+- Disk is tight (~39 GB free of 99 GB). The workspace is already ~39 GB, and a
   from-scratch run needs 60–80 GB free. Do not delete anything under
   `Age_trajectory/` without asking.
 
