@@ -302,7 +302,7 @@ for (pkg in packages) {{
         "expression_share_kept": 0.98862,
         "expression_share_dropped": 0.01138,
         "vocabulary_checked_against": (
-            "archive/vendor/scGPT-main/scgpt/tokenizer/default_census_vocab.json "
+            "ARCHIVE/vendor/scGPT-main/scgpt/tokenizer/default_census_vocab.json "
             "(60,694 tokens; reproduces the run's 15,960/3,729 split exactly)"
         ),
         "canonical_markers_dropped": "none of 65 checked",
